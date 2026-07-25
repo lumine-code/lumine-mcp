@@ -1,10 +1,8 @@
-@import "ui-variables";
-
-.pulsar-mcp .tag {
+.lumine-mcp .tag {
   margin-right: 5px;
   border: solid 1px;
   padding: 0.2em 0.4em;
   border-radius: 6px;
   vertical-align: baseline;
-  color: @syntax-color-constant;
+  color: var(--syntax-color-constant);
 }

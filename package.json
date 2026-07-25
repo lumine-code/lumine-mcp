@@ -1,24 +1,34 @@
 {
-  "name": "pulsar-mcp",
-  "main": "./lib/main",
-  "version": "0.5.1",
-  "description": "Model Context Protocol server, that provides Pulsar editor tools to AI assistants",
+  "name": "lumine-mcp",
+  "author": "lumine-code",
+  "description": "Model Context Protocol server, that provides Lumine editor tools to AI assistants",
+  "repository": "https://github.com/lumine-code/lumine-mcp",
+  "bugs": {
+    "url": "https://github.com/lumine-code/lumine-mcp/issues"
+  },
   "keywords": [
     "mcp",
-    "pulsar",
+    "lumine",
     "editor",
     "tools"
   ],
-  "activationHooks": [
-    "core:loaded-shell-environment"
-  ],
-  "repository": "https://github.com/asiloisad/pulsar-pulsar-mcp",
+  "version": "1.0.0",
   "license": "MIT",
   "engines": {
     "atom": ">=1.100.0 <2.0.0"
   },
+  "main": "./lib/main",
+  "scripts": {
+    "test": "cd ../lumine && npm run test:only -- ../lumine-mcp/spec",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "activationHooks": [
+    "core:loaded-shell-environment"
+  ],
   "providedServices": {
-    "pulsar-mcp": {
+    "lumine-mcp": {
       "versions": {
         "1.0.0": "provideService"
       }
@@ -34,19 +44,17 @@
   "configSchema": {
     "autoStart": {
       "title": "Auto Start",
-      "description": "Automatically start the MCP bridge server when Pulsar opens",
+      "description": "Automatically start the MCP bridge server when Lumine opens",
       "type": "boolean",
-      "default": true,
-      "order": 0
+      "default": true
     },
     "bridgePort": {
       "title": "Bridge Base Port",
       "description": "Base port for MCP bridge. Auto-increments for multiple windows (e.g., 3000, 3001, 3002)",
       "type": "integer",
-      "default": 3000,
       "minimum": 1024,
       "maximum": 65535,
-      "order": 1
+      "default": 3000
     },
     "listMode": {
       "title": "List Mode",
@@ -56,31 +64,36 @@
         "blacklist",
         "greenlist"
       ],
-      "default": "blacklist",
-      "order": 97
+      "default": "blacklist"
     },
     "toolList": {
       "title": "Tool List",
       "description": "MCP tool names interpreted as blacklist or greenlist depending on List Mode (managed via toggle-tools command)",
       "type": "array",
-      "default": [
-        "CloseFile",
-        "RemoveProjectPath"
-      ],
       "items": {
         "type": "string"
       },
-      "order": 98
+      "default": [
+        "CloseFile",
+        "RemoveProjectPath"
+      ]
     },
     "debugMode": {
       "title": "Debug Mode",
       "description": "Enable debug logging to console for troubleshooting",
       "type": "boolean",
-      "default": false,
-      "order": 99
+      "default": false
     }
   },
   "dependencies": {
-    "@asiloisad/select-list": "^1.6.0"
+    "@lumine-code/select-list": "https://github.com/lumine-code/select-list.git#fbbc2d9660db6a2ff676c7a3baf7536f96ec34e6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-n": "^18.2.2",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.6"
   }
 }
