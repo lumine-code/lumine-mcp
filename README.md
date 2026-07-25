@@ -96,7 +96,7 @@ Consuming the `lumine-mcp` service, in your `package.json`:
   "consumedServices": {
     "lumine-mcp": {
       "versions": {
-        "1.0.0": "consumeLumineMcp"
+        "^1.0.0": "consumeLumineMcp"
       }
     }
   }
