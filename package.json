@@ -1,7 +1,7 @@
 {
   "name": "lumine-mcp",
   "author": "lumine-code",
-  "description": "Model Context Protocol server, that provides Lumine editor tools to AI assistants",
+  "description": "Model Context Protocol server exposing editor tools to AI assistants.",
   "repository": "https://github.com/lumine-code/lumine-mcp",
   "bugs": {
     "url": "https://github.com/lumine-code/lumine-mcp/issues"

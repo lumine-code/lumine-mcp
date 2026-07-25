@@ -1,6 +1,6 @@
 # lumine-mcp
 
-Model Context Protocol server, that provides Lumine editor tools to AI assistants.
+Model Context Protocol server exposing editor tools to AI assistants.
 
 ## Features
 
