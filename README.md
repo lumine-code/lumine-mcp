@@ -86,8 +86,8 @@ On Windows, use `"%USERPROFILE%\.lumine\packages\lumine-mcp\lib\server.js"`.
 
 ## Services
 
-- **mcp.bridge** (`1.0.0`): provided to other packages to read the MCP bridge state: port, running status, and server script path.
-- **mcp.tools** (`^1.0.0`): consumed to let other packages register additional MCP tools; each tool defines a name, description, input schema, and execute function.
+- **[mcp.bridge](docs/mcp.bridge.md)** (`1.0.0`): provided to other packages to read the MCP bridge state: port, running status, and server script path.
+- **[mcp.tools](docs/mcp.tools.md)** (`^1.0.0`): consumed to let other packages register additional MCP tools; each tool defines a name, description, input schema, and execute function.
 
 Consuming the `mcp.bridge` service, in your `package.json`:
 
