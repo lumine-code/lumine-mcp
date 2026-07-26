@@ -31,14 +31,14 @@
     "core:loaded-shell-environment"
   ],
   "providedServices": {
-    "lumine-mcp": {
+    "mcp.bridge": {
       "versions": {
-        "1.0.0": "provideService"
+        "1.0.0": "provideMcpBridge"
       }
     }
   },
   "consumedServices": {
-    "mcp-tools": {
+    "mcp.tools": {
       "versions": {
         "^1.0.0": "consumeMcpTools"
       }

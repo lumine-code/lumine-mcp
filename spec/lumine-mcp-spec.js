@@ -15,7 +15,7 @@ describe("lumine-mcp", () => {
 
   describe("lumine-mcp service", () => {
     it("exposes the bridge state accessors", () => {
-      const service = mainModule.provideService();
+      const service = mainModule.provideMcpBridge();
       expect(typeof service.getBridgePort).toBe("function");
       expect(typeof service.isRunning).toBe("function");
       expect(typeof service.getServerPath).toBe("function");

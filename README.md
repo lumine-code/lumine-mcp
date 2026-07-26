@@ -8,7 +8,7 @@ Model Context Protocol server exposing editor tools to AI assistants.
 - **HTTP bridge**: server running inside Lumine for direct API access.
 - **Standalone server**: MCP server script for Claude CLI integration.
 - **Editor tools**: get/set content, open/save files, manage selections.
-- **Extensible**: other packages can register tools via `mcp-tools` service.
+- **Extensible**: other packages can register tools via `mcp.tools` service.
 - **Toggle tools**: enable/disable individual tools via select list. Destructive tools disabled by default.
 
 ## Installation
@@ -86,15 +86,15 @@ On Windows, use `"%USERPROFILE%\.lumine\packages\lumine-mcp\lib\server.js"`.
 
 ## Services
 
-- **lumine-mcp** (`1.0.0`): provided to other packages to read the MCP bridge state: port, running status, and server script path.
-- **mcp-tools** (`^1.0.0`): consumed to let other packages register additional MCP tools; each tool defines a name, description, input schema, and execute function.
+- **mcp.bridge** (`1.0.0`): provided to other packages to read the MCP bridge state: port, running status, and server script path.
+- **mcp.tools** (`^1.0.0`): consumed to let other packages register additional MCP tools; each tool defines a name, description, input schema, and execute function.
 
-Consuming the `lumine-mcp` service, in your `package.json`:
+Consuming the `mcp.bridge` service, in your `package.json`:
 
 ```json
 {
   "consumedServices": {
-    "lumine-mcp": {
+    "mcp.bridge": {
       "versions": {
         "^1.0.0": "consumeLumineMcp"
       }
@@ -118,12 +118,12 @@ consumeLumineMcp(service) {
 }
 ```
 
-Providing extra tools via the `mcp-tools` service, in your `package.json`:
+Providing extra tools via the `mcp.tools` service, in your `package.json`:
 
 ```json
 {
   "providedServices": {
-    "mcp-tools": {
+    "mcp.tools": {
       "versions": {
         "1.0.0": "provideMcpTools"
       }
