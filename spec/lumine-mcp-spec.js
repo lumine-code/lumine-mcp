@@ -148,5 +148,107 @@ describe("lumine-mcp", () => {
       ({ tools } = await (await fetch(`${base}/tools`)).json());
       expect(tools.map((t) => t.name)).not.toContain("SpecTool");
     });
+
+    // The stdio shim used to answer `initialize` and `tools/list` out of its
+    // own copy of the protocol, which drifted from the bridge's. It forwards
+    // now, and these hold it to that: whatever the bridge says, it says.
+    describe("the stdio server", () => {
+      let server, lines, pending;
+
+      const ask = (message) => {
+        const answer = new Promise((resolve) => pending.push(resolve));
+        server.stdin.write(JSON.stringify(message) + "\n");
+        return answer;
+      };
+
+      const overHttp = async (message) => {
+        const response = await fetch(`${base}/mcp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(message),
+        });
+        return response.status === 202 ? null : response.json();
+      };
+
+      beforeEach(() => {
+        jasmine.useRealClock();
+        lines = [];
+        pending = [];
+        server = require("child_process").spawn(
+          process.execPath,
+          [path.join(__dirname, "..", "lib", "server.js")],
+          {
+            env: {
+              ...process.env,
+              ELECTRON_RUN_AS_NODE: "1",
+              LUMINE_BRIDGE_HOST: "127.0.0.1",
+              LUMINE_BRIDGE_PORT: String(bridge.port),
+            },
+            stdio: ["pipe", "pipe", "pipe"],
+          },
+        );
+        require("readline")
+          .createInterface({ input: server.stdout })
+          .on("line", (line) => {
+            lines.push(JSON.parse(line));
+            pending.shift()?.(lines[lines.length - 1]);
+          });
+      });
+
+      afterEach(async () => {
+        server.stdin.end();
+        await new Promise((resolve) => server.once("exit", resolve));
+      });
+
+      it("answers initialize exactly as the bridge does", async () => {
+        const message = {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2025-11-25", clientInfo: { name: "spec" } },
+        };
+        expect(await ask(message)).toEqual(await overHttp(message));
+      });
+
+      it("answers tools/list exactly as the bridge does", async () => {
+        const message = { jsonrpc: "2.0", id: 2, method: "tools/list" };
+        expect(await ask(message)).toEqual(await overHttp(message));
+      });
+
+      // Neither of these reached the old shim's own switch statement.
+      it("answers ping, which it never used to implement", async () => {
+        const answer = await ask({ jsonrpc: "2.0", id: 3, method: "ping" });
+        expect(answer).toEqual({ jsonrpc: "2.0", id: 3, result: {} });
+      });
+
+      it("answers every message of a batch", async () => {
+        const answer = await ask([
+          { jsonrpc: "2.0", id: 4, method: "ping" },
+          { jsonrpc: "2.0", id: 5, method: "ping" },
+        ]);
+        expect(answer).toEqual([
+          { jsonrpc: "2.0", id: 4, result: {} },
+          { jsonrpc: "2.0", id: 5, result: {} },
+        ]);
+      });
+
+      it("says nothing back to a notification", async () => {
+        server.stdin.write(
+          JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n",
+        );
+        expect(await ask({ jsonrpc: "2.0", id: 6, method: "ping" })).toEqual({
+          jsonrpc: "2.0",
+          id: 6,
+          result: {},
+        });
+        expect(lines.length).toBe(1);
+      });
+
+      it("reports a malformed line without asking the bridge", async () => {
+        const answer = new Promise((resolve) => pending.push(resolve));
+        server.stdin.write("not json\n");
+        expect((await answer).error.code).toBe(-32700);
+      });
+    });
   });
 });

@@ -6,7 +6,7 @@ Model Context Protocol server exposing editor tools to AI assistants.
 
 - **MCP protocol**: version 2025-11-25 with tool annotations support.
 - **HTTP bridge**: server running inside Lumine for direct API access.
-- **Standalone server**: MCP server script for Claude CLI integration.
+- **Standalone server**: stdio script for Claude CLI, answering out of the same endpoint the bridge serves over HTTP.
 - **Editor tools**: get/set content, open/save files, manage selections.
 - **Extensible**: other packages can register tools via `mcp.tools` service.
 - **Toggle tools**: enable/disable individual tools via select list. Destructive tools disabled by default.
