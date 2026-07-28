@@ -1,4 +1,5 @@
-.lumine-mcp .tag {
+/* The tool name reads as a tag; the kernel renders it as the row's label. */
+.lumine-mcp .primary-text {
   margin-right: 5px;
   border: solid 1px;
   padding: 0.2em 0.4em;

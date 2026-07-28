@@ -26,6 +26,127 @@ describe("lumine-mcp", () => {
     });
   });
 
+  // The tool list runs on the core modal kernel. `lumine/spec/helpers/modal-helpers`
+  // is the shared vocabulary for these, but it cannot be required from here: the
+  // editor checkout sits at a different depth in CI than it does in the
+  // workspace, so the specs read `atom.modals` directly instead.
+  describe("the tool list", () => {
+    const session = () => atom.modals.getActiveSession();
+    const dispatch = (command) => atom.commands.dispatch(session().element, command);
+    const labels = () =>
+      Array.from(session().element.querySelectorAll("ol.list-group > li .primary-text")).map(
+        (li) => li.textContent,
+      );
+
+    // Every verb writes config synchronously and then asks the kernel to re-run
+    // the source; this drains that hop.
+    const settle = async () => {
+      if (typeof advanceClock === "function") advanceClock(0);
+      await Promise.resolve();
+      const run = session()?.frame?.run;
+      if (run) await run.whenSettled();
+      await Promise.resolve();
+    };
+
+    const toggleCommand = () =>
+      atom.commands.dispatch(atom.workspace.getElement(), "lumine-mcp:toggle-tools");
+
+    const open = async () => {
+      toggleCommand();
+      await settle();
+    };
+
+    beforeEach(() => {
+      atom.config.set("lumine-mcp.listMode", "blacklist");
+      atom.config.set("lumine-mcp.toolList", ["CloseFile", "RemoveProjectPath"]);
+    });
+
+    afterEach(() => {
+      if (atom.modals.isOpen()) atom.modals.cancel("spec");
+    });
+
+    it("lists every tool, and toggles closed again", async () => {
+      await open();
+      expect(labels()).toContain("GetActiveEditor");
+      expect(labels()).toContain("CloseFile");
+
+      toggleCommand();
+      expect(atom.modals.isOpen()).toBe(false);
+    });
+
+    it("toggles the focused tool in the list without closing", async () => {
+      await open();
+      const name = session().getVisibleItems()[0].name;
+      expect(session().getFocusedItem().enabled).toBe(true);
+
+      dispatch("core:confirm");
+      await settle();
+
+      expect(atom.config.get("lumine-mcp.toolList")).toContain(name);
+      expect(atom.modals.isOpen()).toBe(true);
+      // The row is re-read from config and the focus stays on it, which is what
+      // makes toggling several tools in one visit possible.
+      expect(session().getFocusedItem().name).toBe(name);
+      expect(session().getFocusedItem().enabled).toBe(false);
+    });
+
+    it("switches between blacklist and greenlist mode", async () => {
+      await open();
+      dispatch("modals:toggle-mode");
+      await settle();
+
+      expect(atom.config.get("lumine-mcp.listMode")).toBe("greenlist");
+      expect(atom.modals.isOpen()).toBe(true);
+    });
+
+    it("fills or clears the list, whichever the mode means by 'all'", async () => {
+      await open();
+      const every = session()
+        .getItems()
+        .map((tool) => tool.name);
+
+      dispatch("modals:disable-all");
+      await settle();
+      expect(atom.config.get("lumine-mcp.toolList")).toEqual(every);
+
+      dispatch("modals:enable-all");
+      await settle();
+      expect(atom.config.get("lumine-mcp.toolList")).toEqual([]);
+
+      dispatch("modals:toggle-mode");
+      await settle();
+      dispatch("modals:enable-all");
+      await settle();
+      expect(atom.config.get("lumine-mcp.toolList")).toEqual(every);
+    });
+
+    it("resets both settings to their schema defaults", async () => {
+      atom.config.set("lumine-mcp.listMode", "greenlist");
+      atom.config.set("lumine-mcp.toolList", []);
+      await open();
+
+      dispatch("modals:reset-defaults");
+      await settle();
+
+      expect(atom.config.get("lumine-mcp.listMode")).toBe("blacklist");
+      expect(atom.config.get("lumine-mcp.toolList")).toEqual(["CloseFile", "RemoveProjectPath"]);
+    });
+
+    // These four used to be `select-list:*` entries in keymaps/lumine-mcp.json.
+    it("binds its verbs on the modal's own scope", async () => {
+      await open();
+      const bound = new Map(
+        atom.keymaps
+          .findKeyBindings({ target: session().element })
+          .map((binding) => [binding.command, binding.keystrokes]),
+      );
+      expect(bound.get("modals:toggle-mode")).toBe("alt-enter");
+      expect(bound.get("modals:enable-all")).toBe("alt-=");
+      expect(bound.get("modals:disable-all")).toBe("alt--");
+      expect(bound.get("modals:reset-defaults")).toBe("alt-0");
+    });
+  });
+
   describe("bridge server", () => {
     let bridge, base;
 

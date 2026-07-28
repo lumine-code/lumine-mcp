@@ -9,7 +9,7 @@ Model Context Protocol server exposing editor tools to AI assistants.
 - **Standalone server**: stdio script for Claude CLI, answering out of the same endpoint the bridge serves over HTTP.
 - **Editor tools**: get/set content, open/save files, manage selections.
 - **Extensible**: other packages can register tools via `mcp.tools` service.
-- **Toggle tools**: enable/disable individual tools via select list. Destructive tools disabled by default.
+- **Toggle tools**: enable/disable individual tools from a modal list. Destructive tools disabled by default.
 
 ## Installation
 
@@ -24,12 +24,12 @@ Commands available in `atom-workspace`:
 - `lumine-mcp:stop`: stop the MCP bridge server,
 - `lumine-mcp:status`: show current bridge status and port.
 
-Commands available in `.lumine-mcp`:
+Commands available in `atom-modal[data-modal-view="lumine-mcp.tools"]`:
 
-- `select-list:toggle-mode`: switch blacklist/greenlist mode,
-- `select-list:enable-all`: enable all tools,
-- `select-list:disable-all`: disable all tools,
-- `select-list:reset-defaults`: reset to defaults.
+- `modals:toggle-mode`: switch blacklist/greenlist mode,
+- `modals:enable-all`: enable all tools,
+- `modals:disable-all`: disable all tools,
+- `modals:reset-defaults`: reset to defaults.
 
 ## Built-in Tools
 
