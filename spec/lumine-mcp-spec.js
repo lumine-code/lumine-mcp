@@ -2,9 +2,16 @@ const path = require("path");
 const { startBridge, stopBridge, setExternalTools } = require("../lib/bridge");
 
 describe("lumine-mcp", () => {
-  let mainModule;
+  let mainModule, modals;
 
   beforeEach(async () => {
+    // The shared modal vocabulary lives in the editor checkout, which sits at a
+    // different depth relative to this package in the workspace than it does in
+    // CI, so resolve it through the running editor instead.
+    modals = require(
+      path.join(atom.getLoadSettings().resourcePath, "spec", "helpers", "modal-helpers"),
+    );
+
     // Keep the bridge from grabbing a real port on activation.
     atom.config.set("lumine-mcp.autoStart", false);
     const activation = atom.packages.activatePackage("lumine-mcp");
@@ -26,27 +33,16 @@ describe("lumine-mcp", () => {
     });
   });
 
-  // The tool list runs on the core modal kernel. `lumine/spec/helpers/modal-helpers`
-  // is the shared vocabulary for these, but it cannot be required from here: the
-  // editor checkout sits at a different depth in CI than it does in the
-  // workspace, so the specs read `atom.modals` directly instead.
+  // The tool list runs on the core modal kernel, so it is asserted through the
+  // editor's own modal spec vocabulary rather than this view's internals.
   describe("the tool list", () => {
-    const session = () => atom.modals.getActiveSession();
-    const dispatch = (command) => atom.commands.dispatch(session().element, command);
-    const labels = () =>
-      Array.from(session().element.querySelectorAll("ol.list-group > li .primary-text")).map(
-        (li) => li.textContent,
-      );
+    const session = () => modals.activeSession();
+    const dispatch = (command) => modals.dispatch(command);
+    const labels = () => modals.visibleLabels();
 
     // Every verb writes config synchronously and then asks the kernel to re-run
     // the source; this drains that hop.
-    const settle = async () => {
-      if (typeof advanceClock === "function") advanceClock(0);
-      await Promise.resolve();
-      const run = session()?.frame?.run;
-      if (run) await run.whenSettled();
-      await Promise.resolve();
-    };
+    const settle = () => modals.settle();
 
     const toggleCommand = () =>
       atom.commands.dispatch(atom.workspace.getElement(), "lumine-mcp:toggle-tools");
@@ -62,7 +58,7 @@ describe("lumine-mcp", () => {
     });
 
     afterEach(() => {
-      if (atom.modals.isOpen()) atom.modals.cancel("spec");
+      if (modals.isModalOpen()) atom.modals.cancel("spec");
     });
 
     it("lists every tool, and toggles closed again", async () => {
@@ -71,7 +67,7 @@ describe("lumine-mcp", () => {
       expect(labels()).toContain("CloseFile");
 
       toggleCommand();
-      expect(atom.modals.isOpen()).toBe(false);
+      expect(modals.isModalOpen()).toBe(false);
     });
 
     it("toggles the focused tool in the list without closing", async () => {
@@ -83,7 +79,7 @@ describe("lumine-mcp", () => {
       await settle();
 
       expect(atom.config.get("lumine-mcp.toolList")).toContain(name);
-      expect(atom.modals.isOpen()).toBe(true);
+      expect(modals.isModalOpen()).toBe(true);
       // The row is re-read from config and the focus stays on it, which is what
       // makes toggling several tools in one visit possible.
       expect(session().getFocusedItem().name).toBe(name);
@@ -96,7 +92,7 @@ describe("lumine-mcp", () => {
       await settle();
 
       expect(atom.config.get("lumine-mcp.listMode")).toBe("greenlist");
-      expect(atom.modals.isOpen()).toBe(true);
+      expect(modals.isModalOpen()).toBe(true);
     });
 
     it("fills or clears the list, whichever the mode means by 'all'", async () => {
