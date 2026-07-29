@@ -26,10 +26,10 @@ Commands available in `atom-workspace`:
 
 Commands available in `.lumine-mcp`:
 
-- `select-list:toggle-mode`: switch blacklist/greenlist mode,
-- `select-list:enable-all`: enable all tools,
-- `select-list:disable-all`: disable all tools,
-- `select-list:reset-defaults`: reset to defaults.
+- `lumine-mcp:toggle-mode`: switch blacklist/greenlist mode,
+- `lumine-mcp:enable-all`: enable all tools,
+- `lumine-mcp:disable-all`: disable all tools,
+- `lumine-mcp:reset-defaults`: reset to defaults.
 
 ## Built-in Tools
 

@@ -3,9 +3,9 @@
     "alt-shift-m": "lumine-mcp:toggle-tools"
   },
   ".lumine-mcp": {
-    "alt-enter": "select-list:toggle-mode",
-    "alt-=": "select-list:enable-all",
-    "alt--": "select-list:disable-all",
-    "alt-0": "select-list:reset-defaults"
+    "alt-enter": "lumine-mcp:toggle-mode",
+    "alt-=": "lumine-mcp:enable-all",
+    "alt--": "lumine-mcp:disable-all",
+    "alt-0": "lumine-mcp:reset-defaults"
   }
 }
