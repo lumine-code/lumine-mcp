@@ -18,7 +18,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "engines": {
-    "lumine": ">=1.100.0 <2.0.0"
+    "lumine": "^1.0.0"
   },
   "backgroundTips": [
     "You can choose which editor tools an AI assistant may call with {{ 'lumine-mcp:toggle-tools' | keystroke }}"
