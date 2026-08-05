@@ -24,6 +24,14 @@
     "You can choose which editor tools an AI assistant may call with {{ 'lumine-mcp:toggle-tools' | keystroke }}"
   ],
   "main": "./lib/main",
+  "files": [
+    "docs",
+    "keymaps",
+    "lib",
+    "menus",
+    "spec",
+    "styles"
+  ],
   "scripts": {
     "test": "lumine --test spec",
     "lint": "eslint . --max-warnings 0",
