@@ -1,5 +1,5 @@
 {
-  "atom-workspace": {
+  "lumine-workspace": {
     "alt-shift-m": "lumine-mcp:toggle-tools"
   },
   ".lumine-mcp": {

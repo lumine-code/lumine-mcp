@@ -17,7 +17,7 @@ To install `lumine-mcp` search for _lumine-mcp_ in the Install pane of the Lumin
 
 ## Commands
 
-Commands available in `atom-workspace`:
+Commands available in `lumine-workspace`:
 
 - `lumine-mcp:toggle-tools`: toggle individual tools on/off,
 - `lumine-mcp:start`: start the MCP bridge server,

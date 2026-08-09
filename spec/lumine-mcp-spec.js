@@ -6,10 +6,10 @@ describe("lumine-mcp", () => {
 
   beforeEach(async () => {
     // Keep the bridge from grabbing a real port on activation.
-    atom.config.set("lumine-mcp.autoStart", false);
-    const activation = atom.packages.activatePackage("lumine-mcp");
-    atom.packages.triggerDeferredActivationHooks();
-    atom.packages.triggerActivationHook("core:loaded-shell-environment");
+    lumine.config.set("lumine-mcp.autoStart", false);
+    const activation = lumine.packages.activatePackage("lumine-mcp");
+    lumine.packages.triggerDeferredActivationHooks();
+    lumine.packages.triggerActivationHook("core:loaded-shell-environment");
     mainModule = (await activation).mainModule;
   });
 

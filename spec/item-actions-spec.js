@@ -2,17 +2,17 @@ describe("lumine-mcp item actions", () => {
   let view;
 
   beforeEach(async () => {
-    jasmine.attachToDOM(atom.views.getView(atom.workspace));
+    jasmine.attachToDOM(lumine.views.getView(lumine.workspace));
     // Keep the bridge from grabbing a real port on activation.
-    atom.config.set("lumine-mcp.autoStart", false);
-    const activation = atom.packages.activatePackage("lumine-mcp");
-    atom.packages.triggerDeferredActivationHooks();
-    atom.packages.triggerActivationHook("core:loaded-shell-environment");
+    lumine.config.set("lumine-mcp.autoStart", false);
+    const activation = lumine.packages.activatePackage("lumine-mcp");
+    lumine.packages.triggerDeferredActivationHooks();
+    lumine.packages.triggerActivationHook("core:loaded-shell-environment");
     view = (await activation).mainModule.toggleToolsView;
   });
 
   afterEach(async () => {
-    await atom.packages.deactivatePackage("lumine-mcp");
+    await lumine.packages.deactivatePackage("lumine-mcp");
   });
 
   it("derives its actions from the command registrations and the keymap", () => {
@@ -51,7 +51,7 @@ describe("lumine-mcp item actions", () => {
     await view.selectList.showItemActions();
 
     expect(view.selectList.itemActionsList.isVisible()).toBeTruthy();
-    expect(atom.workspace.getModalTrail()).toEqual(["MCP Tools", "Actions"]);
+    expect(lumine.workspace.getModalTrail()).toEqual(["MCP Tools", "Actions"]);
     // The actions list wears the package class, so the package keymap
     // resolves action keystrokes inside it too.
     expect(view.selectList.itemActionsList.element.classList.contains("lumine-mcp")).toBe(true);
