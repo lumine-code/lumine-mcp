@@ -44,7 +44,16 @@ module.exports = [
     // Jasmine specs run in the editor's test runner with its fake-clock helper.
     files: ["spec/**", "**/*-spec.js"],
     languageOptions: {
-      globals: { ...globals.jasmine, advanceClock: "readonly" },
+      globals: {
+        ...globals.jasmine,
+        advanceClock: "readonly",
+        // Waiting primitives injected onto `window` by the editor's spec harness.
+        conditionPromise: "readonly",
+        emitterEventPromise: "readonly",
+        flushMicrotasks: "readonly",
+        timeoutPromise: "readonly",
+        waitForFrames: "readonly",
+      },
     },
     rules: {
       "n/no-missing-require": "off",
