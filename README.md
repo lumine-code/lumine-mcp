@@ -50,39 +50,69 @@ Commands available in `.lumine-mcp`:
 
 ## MCP Client Integration
 
-The standalone MCP server (`lib/server.js`) can be used with any MCP-compatible client. The server connects to the Lumine bridge via `LUMINE_BRIDGE_PORT` (default `3000`). Check the actual port with `lumine-mcp:status`. It auto-increments when multiple Lumine windows are open.
+The standalone MCP server (`lib/server.js`) works with any MCP host that can spawn a command.
+
+**It finds the editor on its own.** Every running bridge publishes its port and a token minted for that run under `~/.lumine/mcp/`, and the server reads that registry on its first message and again after any failure. A host configured once keeps working across editor restarts, across bridges that land on a different port, and with several windows open. Nothing needs configuring when the port changes.
 
 ### Claude Code
 
-Register the server with the Claude CLI:
+Register the server with the Claude CLI, from the directory the package is installed in:
 
 ```bash
-claude mcp add -e LUMINE_BRIDGE_PORT=3000 lumine -- node ~/.lumine/packages/lumine-mcp/lib/server.js
+claude mcp add lumine -- node ~/.lumine/packages/lumine-mcp/lib/server.js
 ```
 
-On Windows:
+On Windows, in PowerShell:
 
 ```bash
-claude mcp add -e LUMINE_BRIDGE_PORT=3000 lumine -- node "%USERPROFILE%\.lumine\packages\lumine-mcp\lib\server.js"
+claude mcp add lumine -- node "$env:USERPROFILE\.lumine\packages\lumine-mcp\lib\server.js"
 ```
 
 ### JSON config
+
+A JSON config expands nothing, so the path has to be absolute and, on Windows, backslash-escaped:
 
 ```json
 {
   "mcpServers": {
     "lumine": {
       "command": "node",
-      "args": ["~/.lumine/packages/lumine-mcp/lib/server.js"],
-      "env": {
-        "LUMINE_BRIDGE_PORT": "3000"
-      }
+      "args": ["/home/you/.lumine/packages/lumine-mcp/lib/server.js"]
     }
   }
 }
 ```
 
-On Windows, use `"%USERPROFILE%\.lumine\packages\lumine-mcp\lib\server.js"`.
+```json
+{
+  "mcpServers": {
+    "lumine": {
+      "command": "node",
+      "args": ["C:\\Users\\you\\.lumine\\packages\\lumine-mcp\\lib\\server.js"]
+    }
+  }
+}
+```
+
+### Pointing at one particular window
+
+With several windows open, the server takes the most recently started bridge that still answers. To pin it to one, set `LUMINE_BRIDGE_PORT` — the port `Lumine MCP: Status` reports for that window — and the registry supplies the token:
+
+```json
+{
+  "mcpServers": {
+    "lumine": {
+      "command": "node",
+      "args": ["/home/you/.lumine/packages/lumine-mcp/lib/server.js"],
+      "env": { "LUMINE_BRIDGE_PORT": "3001" }
+    }
+  }
+}
+```
+
+### Talking to the bridge directly
+
+The bridge is HTTP, and anything that speaks MCP over streamable HTTP can use it without this shim — but it is not an open port. Requests must present the token from `~/.lumine/mcp/<port>.json` as `Authorization: Bearer <token>`, and any request carrying an `Origin` header is refused outright: a browser is never a legitimate caller, and the loopback interface is reachable from every page the user visits. `GET /health` is the only route that answers without the token, so a client can confirm a published endpoint before trusting it.
 
 ## Services
 
