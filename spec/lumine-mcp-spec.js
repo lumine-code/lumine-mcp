@@ -1,7 +1,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { startBridge, stopBridge, setExternalTools } = require("../lib/bridge");
+const { startBridge, stopBridge, setExternalTools, openStreamCount } = require("../lib/bridge");
 const endpoint = require("../lib/endpoint");
 
 describe("lumine-mcp", () => {
@@ -183,6 +183,155 @@ describe("lumine-mcp", () => {
       expect(result.error).toContain("disabled");
     });
 
+    describe("the protocol lifecycle", () => {
+      const initialize = (protocolVersion) => ({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion, clientInfo: { name: "spec" } },
+      });
+
+      const openSession = async () => {
+        const response = await post("/mcp", initialize("2025-11-25"));
+        return response.headers.get("mcp-session-id");
+      };
+
+      // Answering in our own version whatever was asked told a client on an
+      // older one that we had agreed to its request when we had not.
+      it("answers initialize in the version the client asked for", async () => {
+        const answer = await (await post("/mcp", initialize("2025-06-18"))).json();
+        expect(answer.result.protocolVersion).toBe("2025-06-18");
+      });
+
+      it("answers in its own version when the client's is unknown", async () => {
+        const answer = await (await post("/mcp", initialize("1.0.0"))).json();
+        expect(answer.result.protocolVersion).toBe("2025-11-25");
+      });
+
+      it("declares that its tool list changes", async () => {
+        const answer = await (await post("/mcp", initialize("2025-11-25"))).json();
+        expect(answer.result.capabilities.tools.listChanged).toBe(true);
+      });
+
+      it("refuses a request that names no session", async () => {
+        const response = await post("/mcp", { jsonrpc: "2.0", id: 2, method: "tools/list" });
+        expect(response.status).toBe(400);
+      });
+
+      it("refuses a request naming a session it does not know", async () => {
+        const response = await fetch(`${base}/mcp`, {
+          method: "POST",
+          headers: {
+            ...auth,
+            "Content-Type": "application/json",
+            "Mcp-Session-Id": "00000000-0000-0000-0000-000000000000",
+          },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
+        });
+        // 404 is what tells a client to start over rather than to give up.
+        expect(response.status).toBe(404);
+      });
+
+      // Both are what a client has before it can hold a session, and a
+      // notification cannot be answered at all, so refusing one is only silent.
+      it("lets initialize, ping and notifications through without one", async () => {
+        expect((await post("/mcp", initialize("2025-11-25"))).status).toBe(200);
+        expect((await post("/mcp", { jsonrpc: "2.0", id: 2, method: "ping" })).status).toBe(200);
+        expect(
+          (await post("/mcp", { jsonrpc: "2.0", method: "notifications/initialized" })).status,
+        ).toBe(202);
+      });
+
+      it("forgets a session that is terminated, and says so afterwards", async () => {
+        const session = await openSession();
+        const headers = { ...auth, "Mcp-Session-Id": session };
+        expect((await fetch(`${base}/mcp`, { method: "DELETE", headers })).status).toBe(204);
+
+        const response = await fetch(`${base}/mcp`, {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list" }),
+        });
+        expect(response.status).toBe(404);
+      });
+
+      it("hands a batch back the session its initialize opened", async () => {
+        const response = await post("/mcp", [
+          initialize("2025-11-25"),
+          { jsonrpc: "2.0", id: 2, method: "ping" },
+        ]);
+        expect(response.headers.get("mcp-session-id")).toBeTruthy();
+      });
+
+      it("refuses an MCP-Protocol-Version it does not speak", async () => {
+        const response = await fetch(`${base}/mcp`, {
+          method: "POST",
+          headers: {
+            ...auth,
+            "Content-Type": "application/json",
+            "MCP-Protocol-Version": "2024-01-01",
+          },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" }),
+        });
+        expect(response.status).toBe(400);
+      });
+
+      describe("the server's own channel to the client", () => {
+        let session, request, frames;
+
+        const text = () => frames.join("");
+
+        beforeEach(async () => {
+          session = await openSession();
+          frames = [];
+          await new Promise((resolve, reject) => {
+            request = require("http").request(
+              {
+                host: "127.0.0.1",
+                port: bridge.port,
+                path: "/mcp",
+                method: "GET",
+                headers: { ...auth, Accept: "text/event-stream", "Mcp-Session-Id": session },
+              },
+              (response) => {
+                response.setEncoding("utf8");
+                response.on("data", (chunk) => frames.push(chunk));
+                resolve();
+              },
+            );
+            request.on("error", reject);
+            request.end();
+          });
+          // The bridge opens with a comment frame, so the stream is known to
+          // be registered before anything is expected to arrive on it.
+          await conditionPromise(() => text().includes(": open"));
+        });
+
+        afterEach(() => {
+          request.destroy();
+        });
+
+        it("says when a package registers a tool", async () => {
+          setExternalTools(new Map([["SpecTool", { name: "SpecTool", execute: () => null }]]));
+          await conditionPromise(() => text().includes("notifications/tools/list_changed"));
+        });
+
+        it("says when the user turns a tool off", async () => {
+          const original = lumine.config.get("lumine-mcp.toolList");
+          lumine.config.set("lumine-mcp.toolList", [...original, "GetActiveEditor"]);
+          await conditionPromise(() => text().includes("notifications/tools/list_changed"));
+          lumine.config.set("lumine-mcp.toolList", original);
+        });
+
+        it("refuses to open one for a session it does not know", async () => {
+          const response = await fetch(`${base}/mcp`, {
+            headers: { ...auth, Accept: "text/event-stream", "Mcp-Session-Id": "nope" },
+          });
+          expect(response.status).toBe(404);
+        });
+      });
+    });
+
     it("speaks the MCP JSON-RPC protocol", async () => {
       const initResponse = await post("/mcp", {
         jsonrpc: "2.0",
@@ -238,7 +387,7 @@ describe("lumine-mcp", () => {
     // own copy of the protocol, which drifted from the bridge's. It forwards
     // now, and these hold it to that: whatever the bridge says, it says.
     describe("the stdio server", () => {
-      let server, lines, pending;
+      let server, lines, pending, httpSession;
 
       const ask = (message) => {
         const answer = new Promise((resolve) => pending.push(resolve));
@@ -246,9 +395,27 @@ describe("lumine-mcp", () => {
         return answer;
       };
 
+      // The shim's opposite number: the same conversation held directly, so
+      // the two can be compared message for message. It keeps its own session
+      // for the same reason the shim keeps one.
       const overHttp = async (message) => {
-        const response = await post("/mcp", message);
+        const headers = { ...auth, "Content-Type": "application/json" };
+        if (httpSession) headers["Mcp-Session-Id"] = httpSession;
+        const response = await fetch(`${base}/mcp`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(message),
+        });
+        const issued = response.headers.get("mcp-session-id");
+        if (issued) httpSession = issued;
         return response.status === 202 ? null : response.json();
+      };
+
+      const INITIALIZE = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-11-25", clientInfo: { name: "spec" } },
       };
 
       // The port pins the shim to this bridge; the token is deliberately not
@@ -281,6 +448,7 @@ describe("lumine-mcp", () => {
         jasmine.useRealClock();
         lines = [];
         pending = [];
+        httpSession = null;
         server = spawnServer();
       });
 
@@ -290,18 +458,36 @@ describe("lumine-mcp", () => {
       });
 
       it("answers initialize exactly as the bridge does", async () => {
-        const message = {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "initialize",
-          params: { protocolVersion: "2025-11-25", clientInfo: { name: "spec" } },
-        };
-        expect(await ask(message)).toEqual(await overHttp(message));
+        expect(await ask(INITIALIZE)).toEqual(await overHttp(INITIALIZE));
       });
 
       it("answers tools/list exactly as the bridge does", async () => {
+        // tools/list belongs to a session now, and each side opens its own.
+        await ask(INITIALIZE);
+        await overHttp(INITIALIZE);
         const message = { jsonrpc: "2.0", id: 2, method: "tools/list" };
         expect(await ask(message)).toEqual(await overHttp(message));
+      });
+
+      // The shim holds the session for the host, which never sees one.
+      it("carries the session it was given through to the next request", async () => {
+        await ask(INITIALIZE);
+        const answer = await ask({ jsonrpc: "2.0", id: 2, method: "tools/list" });
+        expect(answer.result.tools.length).toBeGreaterThan(0);
+      });
+
+      // Nothing the host sent asked for this: it starts at the bridge.
+      it("relays a notification the bridge starts", async () => {
+        await ask(INITIALIZE);
+        const relayed = new Promise((resolve) => pending.push(resolve));
+        // The shim opens its stream once initialize is answered, which is a
+        // round trip behind the answer the host already has.
+        await conditionPromise(() => openStreamCount() > 0);
+        setExternalTools(new Map([["SpecTool", { name: "SpecTool", execute: () => null }]]));
+        expect(await relayed).toEqual({
+          jsonrpc: "2.0",
+          method: "notifications/tools/list_changed",
+        });
       });
 
       // Neither of these reached the old shim's own switch statement.
