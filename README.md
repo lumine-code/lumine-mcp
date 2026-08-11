@@ -4,11 +4,12 @@ Model Context Protocol server exposing editor tools to AI assistants.
 
 ## Features
 
-- **MCP protocol**: version 2025-11-25 with tool annotations support.
-- **HTTP bridge**: server running inside Lumine for direct API access.
-- **Standalone server**: stdio script for Claude CLI, answering out of the same endpoint the bridge serves over HTTP.
+- **MCP protocol**: speaks 2025-11-25, 2025-06-18 and 2025-03-26, negotiated per client, with tool annotations.
+- **HTTP bridge**: server running inside Lumine for direct API access, reachable only by a local process holding the token it publishes.
+- **Standalone server**: stdio script for Claude CLI, finding the editor by itself and answering out of the same endpoint the bridge serves over HTTP.
 - **Editor tools**: get/set content, open/save files, manage selections.
 - **Extensible**: other packages can register tools via `mcp.tools` service.
+- **Live tool list**: clients are told when tools are registered, withdrawn, or switched off.
 - **Toggle tools**: enable/disable individual tools via select list. Destructive tools disabled by default.
 
 ## Installation
@@ -47,6 +48,10 @@ Commands available in `.lumine-mcp`:
 | `GetProjectPaths`   | Get project root folders                                                                        | Enabled  |
 | `AddProjectPath`    | Add a folder to project roots                                                                   | Enabled  |
 | `RemoveProjectPath` | Remove a folder from project roots                                                              | Disabled |
+
+A tool that takes a `path` matches it the way the filesystem does — case-insensitively and separator-agnostically on Windows, exactly on POSIX — and resolves a relative one against the project roots.
+
+Which tools are on is a list plus a mode. Under a **blacklist**, everything is on except what is listed, and a tool registered later arrives on; under a **greenlist**, only what is listed is on, and a tool registered later arrives off. Switching mode inverts the list with it, so the same tools stay on and only the default for a newcomer changes.
 
 ## MCP Client Integration
 

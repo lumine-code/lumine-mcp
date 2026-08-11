@@ -33,8 +33,15 @@ In your `package.json`:
 type Tool = {
   name: string;
   execute(args: object): unknown | Promise<unknown>;
+  title?: string;
   description?: string;
   inputSchema?: object;
+  annotations?: {
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    openWorldHint?: boolean;
+  };
 };
 ```
 
@@ -42,8 +49,21 @@ type Tool = {
 | --------------- | -------------------------------------------------------------------------------- |
 | `name`          | Required. The tool name the host calls, and the key it is registered under.      |
 | `execute(args)` | Required. Runs the tool and returns its result. May be async.                    |
+| `title`         | A human-readable name for a host to display instead of `name`.                   |
 | `description`   | What the tool does, for the host to show the model. Defaults to an empty string. |
 | `inputSchema`   | A JSON Schema for `args`, so the host can validate and describe the call.        |
+| `annotations`   | Behaviour hints, passed to the host verbatim. See below.                         |
+
+`annotations` is how a host decides what to confirm with the user before calling. Set `readOnlyHint: true` on a tool that only reads; the other three describe a tool that writes and are read only when `readOnlyHint` is false:
+
+| Hint              | Meaning                                                            |
+| ----------------- | ------------------------------------------------------------------ |
+| `readOnlyHint`    | The tool does not change anything. Defaults to false.              |
+| `destructiveHint` | It may overwrite or discard. **Defaults to true** — say so if not. |
+| `idempotentHint`  | Calling it twice with the same arguments leaves the same state.    |
+| `openWorldHint`   | It reaches something outside the editor. Defaults to true.         |
+
+The default on `destructiveHint` is the one worth setting deliberately: a writing tool that omits it is described to the host as destructive, and hosts confirm those more insistently.
 
 ## Minimal example
 
@@ -58,6 +78,7 @@ module.exports = {
           type: "object",
           properties: { target: { type: "string" } },
         },
+        annotations: { readOnlyHint: true, openWorldHint: false },
         execute: ({ target }) => this.statusFor(target),
       },
     ];
@@ -69,7 +90,9 @@ module.exports = {
 
 **Tools missing `name` or `execute` are skipped individually**, with an error logged, and the rest of the array still registers. A malformed tool therefore fails silently from the user's point of view — check the console when a tool does not appear.
 
-Names are a **flat global namespace** shared with every other package's tools and with `lumine-mcp`'s built-ins. Registering a name already taken replaces the previous tool, so prefix distinctively; `GetLinterMessages` rather than `Get`.
+Names are a **flat global namespace** shared with every other package's tools and with `lumine-mcp`'s built-ins, so prefix distinctively — `GetLinterMessages` rather than `Get`.
+
+**A built-in's name is refused**, with an error logged and nothing registered under it: execution resolves the built-in first, so the tool would be listed and then never reachable. Between two packages the later registration wins, and withdrawing the earlier one leaves the winner in place rather than taking it down with it.
 
 Prefer read-only tools, and design a mutating one to be idempotent and narrowly scoped — the caller is a model, and it may retry.
 
