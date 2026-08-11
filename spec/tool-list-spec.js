@@ -147,6 +147,28 @@ describe("lumine-mcp tool list", () => {
     });
   });
 
+  // The shipped list names tools this package does not own, which is the only
+  // way a package can ship a tool disabled today. Nothing connects the two
+  // spellings, so a rename in jupyter-repl would quietly turn these back on —
+  // this is what would notice.
+  describe("a tool another package ships disabled", () => {
+    it("stays off when that package registers it", async () => {
+      setExternalTools(
+        new Map(
+          ["JupyterListKernels", "JupyterExecute", "JupyterRestart"].map((name) => [
+            name,
+            { name, execute: () => null },
+          ]),
+        ),
+      );
+
+      const served = await servedTools();
+      expect(served).toContain("JupyterListKernels");
+      expect(served).not.toContain("JupyterExecute");
+      expect(served).not.toContain("JupyterRestart");
+    });
+  });
+
   describe("reset-defaults", () => {
     it("puts back the list and the mode the package ships with", async () => {
       view.toggleMode();
