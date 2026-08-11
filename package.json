@@ -82,14 +82,16 @@
     },
     "toolList": {
       "title": "Tool List",
-      "description": "MCP tool names interpreted as blacklist or greenlist depending on List Mode (managed via toggle-tools command)",
+      "description": "MCP tool names interpreted as blacklist or greenlist depending on List Mode (managed via toggle-tools command). The defaults are the tools that discard something: a closed tab, a project root, a kernel's variables, or the state of the session an assistant runs code in",
       "type": "array",
       "items": {
         "type": "string"
       },
       "default": [
         "CloseFile",
-        "RemoveProjectPath"
+        "RemoveProjectPath",
+        "JupyterExecute",
+        "JupyterRestart"
       ]
     },
     "debugMode": {

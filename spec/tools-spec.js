@@ -61,6 +61,66 @@ describe("lumine-mcp builtin tools", () => {
     });
   });
 
+  // The one thing these two do that the agent's own file tools cannot: read
+  // and write what the user has in front of them but has not saved. Reading
+  // such a file from disk answers with content the user has already changed,
+  // and writing it there throws that work away.
+  describe("unsaved buffers", () => {
+    let other, otherPath;
+
+    beforeEach(async () => {
+      otherPath = path.join(directory, "other.js");
+      fs.writeFileSync(otherPath, "on disk\n");
+      other = await lumine.workspace.open(otherPath);
+      other.setText("in the buffer\n");
+      // Opened second, then left behind: the point is that neither tool needs
+      // the file it acts on to be the one the user is looking at.
+      await lumine.workspace.open(filePath);
+    });
+
+    it("reads a modified buffer the user is not looking at", async () => {
+      const answer = await run("ReadText", { path: otherPath });
+      expect(answer.content).toBe("in the buffer\n");
+      expect(answer.modified).toBe(true);
+      expect(answer.path).toBe(otherPath);
+      expect(fs.readFileSync(otherPath, "utf8")).toBe("on disk\n");
+    });
+
+    it("still reads the active editor when given no path", async () => {
+      expect((await run("ReadText")).path).toBe(filePath);
+    });
+
+    it("reports a buffer that matches its file as unmodified", async () => {
+      expect((await run("ReadText", { path: filePath })).modified).toBe(false);
+    });
+
+    it("writes into a buffer the user is not looking at", async () => {
+      const answer = await run("WriteText", {
+        path: otherPath,
+        text: "written\n",
+        start: { row: 0, column: 0 },
+        end: { row: 0, column: 13 },
+      });
+      expect(answer.written).toBe(true);
+      expect(answer.oldText).toBe("in the buffer");
+      expect(other.getText()).toBe("written\n\n");
+      // Left unsaved, for the user to look at before it reaches disk.
+      expect(fs.readFileSync(otherPath, "utf8")).toBe("on disk\n");
+    });
+
+    it("says so plainly when the path names no open editor", async () => {
+      const absent = { path: path.join(directory, "closed.js"), text: "x" };
+      expect(await run("ReadText", { path: absent.path })).toBeNull();
+      expect(await run("WriteText", absent)).toEqual({ written: false });
+    });
+
+    // GetOpenEditors is where a caller learns it must not read from disk.
+    it("reports which open files hold unsaved work", async () => {
+      const dirty = (await run("GetOpenEditors")).filter((editor) => editor.modified);
+      expect(dirty.map((editor) => editor.path)).toEqual([otherPath]);
+    });
+  });
+
   describe("ReadText", () => {
     beforeEach(async () => {
       await lumine.workspace.open(filePath);

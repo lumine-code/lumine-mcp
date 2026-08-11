@@ -34,24 +34,33 @@ Commands available in `.lumine-mcp`:
 
 ## Built-in Tools
 
-| Tool                | Description                                                                                     | Default  |
-| ------------------- | ----------------------------------------------------------------------------------------------- | -------- |
-| `GetActiveEditor`   | Get editor metadata (path, grammar, modified, lineCount)                                        | Enabled  |
-| `GetOpenEditors`    | Get metadata for all open text editors                                                          | Enabled  |
-| `ReadText`          | Read active editor content with line pagination (use agent's file tools for other files)        | Enabled  |
-| `WriteText`         | Write text at cursor or replace range in active editor (use agent's file tools for other files) | Enabled  |
-| `OpenFile`          | Open an existing file in editor with optional position (`create=true` allows new files)         | Enabled  |
-| `SaveFile`          | Save a file (active editor or specific path)                                                    | Enabled  |
-| `GetSelections`     | Get all selections/cursors with positions and text from active editor                           | Enabled  |
-| `SetSelections`     | Set multiple selections/cursors at specific positions in active editor                          | Enabled  |
-| `CloseFile`         | Close an editor tab                                                                             | Disabled |
-| `GetProjectPaths`   | Get project root folders                                                                        | Enabled  |
-| `AddProjectPath`    | Add a folder to project roots                                                                   | Enabled  |
-| `RemoveProjectPath` | Remove a folder from project roots                                                              | Disabled |
+| Tool                | Description                                                                             | Default  |
+| ------------------- | --------------------------------------------------------------------------------------- | -------- |
+| `GetActiveEditor`   | Get editor metadata (path, grammar, modified, lineCount)                                | Enabled  |
+| `GetOpenEditors`    | Get metadata for all open text editors                                                  | Enabled  |
+| `ReadText`          | Read an open editor's buffer, including unsaved changes the file on disk does not have  | Enabled  |
+| `WriteText`         | Write into an open editor's buffer, leaving the change unsaved for review               | Enabled  |
+| `OpenFile`          | Open an existing file in editor with optional position (`create=true` allows new files) | Enabled  |
+| `SaveFile`          | Save a file (active editor or specific path)                                            | Enabled  |
+| `GetSelections`     | Get all selections/cursors with positions and text from active editor                   | Enabled  |
+| `SetSelections`     | Set multiple selections/cursors at specific positions in active editor                  | Enabled  |
+| `CloseFile`         | Close an editor tab                                                                     | Disabled |
+| `GetProjectPaths`   | Get project root folders                                                                | Enabled  |
+| `AddProjectPath`    | Add a folder to project roots                                                           | Enabled  |
+| `RemoveProjectPath` | Remove a folder from project roots                                                      | Disabled |
 
 A tool that takes a `path` matches it the way the filesystem does — case-insensitively and separator-agnostically on Windows, exactly on POSIX — and resolves a relative one against the project roots.
 
+An assistant brings its own file tools, its own search and its own shell, and they are better than anything here at reading a file off disk. `ReadText` and `WriteText` are for the case those tools get wrong: a buffer with unsaved changes, where the disk holds something the user has already moved past. `GetOpenEditors` is what reveals it, reporting `modified` per file.
+
 Which tools are on is a list plus a mode. Under a **blacklist**, everything is on except what is listed, and a tool registered later arrives on; under a **greenlist**, only what is listed is on, and a tool registered later arrives off. Switching mode inverts the list with it, so the same tools stay on and only the default for a newcomer changes.
+
+## Tools from other packages
+
+Any package can publish tools of its own through the `mcp.tools` service, and they appear in the same list. Two do today:
+
+- **linter** — `GetLinterMessages`, the diagnostics as the editor has them, filterable by file, severity and provider.
+- **jupyter-repl** — `JupyterListKernels`, `JupyterExecute`, `JupyterInspect`, `JupyterInterrupt` and `JupyterRestart`, for the live kernel session. `JupyterExecute` and `JupyterRestart` are disabled by default: one runs code in the user's own session and the other discards it.
 
 ## MCP Client Integration
 

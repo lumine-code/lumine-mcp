@@ -155,7 +155,14 @@ describe("lumine-mcp tool list", () => {
       view.resetDefaults();
 
       expect(view.listMode).toBe("blacklist");
-      expect(view.toolList).toEqual(["CloseFile", "RemoveProjectPath"]);
+      // The tools that discard something: a tab, a project root, and — from
+      // jupyter-repl, whether or not it is installed — a kernel's variables.
+      expect(view.toolList).toEqual([
+        "CloseFile",
+        "RemoveProjectPath",
+        "JupyterExecute",
+        "JupyterRestart",
+      ]);
       const served = await servedTools();
       expect(served).toContain("GetActiveEditor");
       expect(served).not.toContain("CloseFile");
