@@ -14,7 +14,7 @@ Model Context Protocol server exposing editor tools to AI assistants.
 
 ## Installation
 
-To install `lumine-mcp` search for _lumine-mcp_ in the Install pane of the Lumine settings or run `lumine --install lumine-code/lumine-mcp`.
+To install `lumine-mcp` search for it in the Install pane of the Lumine settings, or run the command `lumine --install lumine-code/lumine-mcp`.
 
 ## Commands
 
@@ -130,8 +130,8 @@ The bridge is HTTP, and anything that speaks MCP over streamable HTTP can use it
 
 ## Services
 
-- **[mcp.bridge](docs/mcp.bridge.md)** (`1.0.0`): provided to other packages to read the MCP bridge state: port, running status, and server script path.
-- **[mcp.tools](docs/mcp.tools.md)** (`^1.0.0`): consumed to let other packages register additional MCP tools; each tool defines a name, description, input schema, and execute function.
+- [`mcp.bridge`](docs/mcp.bridge.md): provided to other packages to read the MCP bridge state: port, running status, and server script path.
+- [`mcp.tools`](docs/mcp.tools.md): consumed to let other packages register additional MCP tools; each tool defines a name, description, input schema, and execute function.
 
 Consuming the `mcp.bridge` service, in your `package.json`:
 
