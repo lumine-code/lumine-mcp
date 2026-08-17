@@ -29,7 +29,7 @@ describe("lumine-mcp item actions", () => {
     const toggleMode = byCommand.get("lumine-mcp:toggle-mode");
     expect(toggleMode.name).toBe("Toggle Mode");
     expect(toggleMode.description).toBe(
-      "Decide whether a tool arriving later is on or off by default",
+      "Decide whether a tool arriving later is on or off by default.",
     );
     expect(toggleMode.keystrokes).toEqual(["alt-enter"]);
     expect(byCommand.get("lumine-mcp:enable-all").keystrokes).toEqual(["alt-="]);
