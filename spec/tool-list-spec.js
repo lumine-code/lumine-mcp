@@ -1,6 +1,3 @@
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
 const { startBridge, stopBridge, setExternalTools } = require("../lib/bridge");
 
 // What the toggle list says and what the bridge serves are two answers to the
@@ -8,7 +5,7 @@ const { startBridge, stopBridge, setExternalTools } = require("../lib/bridge");
 // as everybody allowed, so "disable all" in greenlist mode drew a cross beside
 // every tool and enabled every one of them. These hold the two together.
 describe("lumine-mcp tool list", () => {
-  let view, bridge, base, auth, registry, originalRegistry;
+  let view, bridge, base, auth;
 
   const servedTools = async () => {
     const response = await fetch(`${base}/tools`, { headers: auth });
@@ -28,10 +25,6 @@ describe("lumine-mcp tool list", () => {
       .sort();
 
   beforeEach(async () => {
-    originalRegistry = process.env.LUMINE_MCP_REGISTRY;
-    registry = fs.mkdtempSync(path.join(os.tmpdir(), "lumine-mcp-registry-"));
-    process.env.LUMINE_MCP_REGISTRY = registry;
-
     jasmine.attachToDOM(lumine.views.getView(lumine.workspace));
     lumine.config.set("lumine-mcp.autoStart", false);
     const activation = lumine.packages.activatePackage("lumine-mcp");
@@ -50,9 +43,6 @@ describe("lumine-mcp tool list", () => {
   afterEach(async () => {
     setExternalTools(new Map());
     await stopBridge(bridge);
-    if (originalRegistry === undefined) delete process.env.LUMINE_MCP_REGISTRY;
-    else process.env.LUMINE_MCP_REGISTRY = originalRegistry;
-    fs.rmSync(registry, { recursive: true, force: true, maxRetries: 3 });
   });
 
   describe("a blacklist", () => {

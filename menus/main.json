@@ -9,7 +9,15 @@
             { "label": "Toggle Tools", "command": "lumine-mcp:toggle-tools" },
             { "label": "Start", "command": "lumine-mcp:start" },
             { "label": "Stop", "command": "lumine-mcp:stop" },
-            { "label": "Status", "command": "lumine-mcp:status" }
+            { "label": "Status", "command": "lumine-mcp:status" },
+            {
+              "label": "Register with Claude Code",
+              "command": "lumine-mcp:register-to-claude"
+            },
+            {
+              "label": "Register with Codex",
+              "command": "lumine-mcp:register-to-codex"
+            }
           ]
         }
       ]

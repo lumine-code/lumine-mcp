@@ -7,10 +7,11 @@
     "url": "https://github.com/lumine-code/lumine-mcp/issues"
   },
   "keywords": [
-    "ai",
-    "claude",
-    "llm",
     "model-context-protocol",
+    "claude",
+    "codex",
+    "llm",
+    "ai",
     "assistant",
     "bridge",
     "http"
@@ -44,7 +45,8 @@
   "providedServices": {
     "mcp.bridge": {
       "versions": {
-        "1.0.0": "provideMcpBridge"
+        "1.0.0": "provideMcpBridge",
+        "1.1.0": "provideMcpBridge"
       }
     }
   },

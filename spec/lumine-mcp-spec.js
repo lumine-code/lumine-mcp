@@ -5,15 +5,14 @@ const { startBridge, stopBridge, setExternalTools, openStreamCount } = require("
 const endpoint = require("../lib/endpoint");
 
 describe("lumine-mcp", () => {
-  let mainModule, registry, originalRegistry;
+  let mainModule, lumineHome, originalLumineHome;
 
   beforeEach(async () => {
-    // LUMINE_HOME is the developer's real one even under `lumine --test`, so
-    // the registry is redirected: a bridge started by a spec must not be
-    // something a real MCP client can find.
-    originalRegistry = process.env.LUMINE_MCP_REGISTRY;
-    registry = fs.mkdtempSync(path.join(os.tmpdir(), "lumine-mcp-registry-"));
-    process.env.LUMINE_MCP_REGISTRY = registry;
+    // Migration reads LUMINE_HOME afresh. Point it at scratch space so package
+    // activation never touches endpoint records belonging to a real window.
+    originalLumineHome = process.env.LUMINE_HOME;
+    lumineHome = fs.mkdtempSync(path.join(os.tmpdir(), "lumine-mcp-home-"));
+    process.env.LUMINE_HOME = lumineHome;
 
     // Keep the bridge from grabbing a real port on activation.
     lumine.config.set("lumine-mcp.autoStart", false);
@@ -24,21 +23,127 @@ describe("lumine-mcp", () => {
   });
 
   afterEach(() => {
-    if (originalRegistry === undefined) delete process.env.LUMINE_MCP_REGISTRY;
-    else process.env.LUMINE_MCP_REGISTRY = originalRegistry;
-    fs.rmSync(registry, { recursive: true, force: true, maxRetries: 3 });
+    if (originalLumineHome === undefined) delete process.env.LUMINE_HOME;
+    else process.env.LUMINE_HOME = originalLumineHome;
+    fs.rmSync(lumineHome, { recursive: true, force: true, maxRetries: 3 });
   });
 
   describe("lumine-mcp service", () => {
+    it("registers the bridge and client setup commands on the workspace", () => {
+      const workspace = lumine.views.getView(lumine.workspace);
+      const commands = lumine.commands
+        .findCommands({ target: workspace })
+        .map((command) => command.name);
+      expect(commands).toContain("lumine-mcp:toggle-tools");
+      expect(commands).toContain("lumine-mcp:start");
+      expect(commands).toContain("lumine-mcp:stop");
+      expect(commands).toContain("lumine-mcp:status");
+      expect(commands).toContain("lumine-mcp:register-to-claude");
+      expect(commands).toContain("lumine-mcp:register-to-codex");
+    });
+
     it("exposes the bridge state accessors", () => {
       const service = mainModule.provideMcpBridge();
       expect(typeof service.getBridgePort).toBe("function");
+      expect(typeof service.getBridgePortWhenReady).toBe("function");
       expect(typeof service.isRunning).toBe("function");
       expect(typeof service.getServerPath).toBe("function");
 
       expect(service.isRunning()).toBe(false);
       expect(service.getBridgePort()).toBeNull();
       expect(path.basename(service.getServerPath())).toBe("server.js");
+    });
+
+    it("returns null from the asynchronous accessor while the bridge is stopped", async () => {
+      expect(await mainModule.provideMcpBridge().getBridgePortWhenReady()).toBeNull();
+    });
+
+    it("coalesces startup with asynchronous port consumers", async () => {
+      const starting = mainModule.startBridge();
+      const duplicate = mainModule.startBridge();
+      const port = await mainModule.provideMcpBridge().getBridgePortWhenReady();
+      const bridge = await starting;
+
+      expect(await duplicate).toBe(bridge);
+      expect(port).toBe(bridge.port);
+      expect(mainModule.bridge).toBe(bridge);
+
+      await mainModule.stopBridge();
+      expect(await mainModule.provideMcpBridge().getBridgePortWhenReady()).toBeNull();
+    });
+
+    it("shows and copies only the listening address", async () => {
+      const write = spyOn(lumine.clipboard, "write");
+      const bridge = await mainModule.startBridge();
+      lumine.notifications.clear();
+
+      mainModule.showStatus();
+      const [notification] = lumine.notifications.getNotifications();
+      const detail = notification.getDetail();
+      expect(detail).toContain(`Port: ${bridge.port}`);
+      expect(detail).toContain(`Host: ${bridge.host}`);
+      expect(detail).toContain("ConnectToLumine");
+      expect(detail).not.toContain(bridge.token);
+      expect(detail).not.toContain("Endpoint:");
+
+      const [button] = notification.getOptions().buttons;
+      expect(button.text).toBe("Copy Port");
+      button.onDidClick();
+      expect(write).toHaveBeenCalledWith(String(bridge.port));
+
+      await mainModule.stopBridge();
+    });
+  });
+
+  describe("legacy endpoint cleanup", () => {
+    it("removes recognized numeric endpoint records and preserves foreign files", () => {
+      const registry = path.join(lumineHome, "mcp");
+      fs.mkdirSync(registry);
+      fs.writeFileSync(
+        path.join(registry, "3000.json"),
+        JSON.stringify({
+          port: 3000,
+          host: "127.0.0.1",
+          token: "live-or-stale-does-not-matter",
+          pid: process.pid,
+          updatedAt: Date.now(),
+        }),
+      );
+      fs.writeFileSync(
+        path.join(registry, "3001.json"),
+        JSON.stringify({ port: 9999, token: "x" }),
+      );
+      fs.writeFileSync(
+        path.join(registry, "3002.json"),
+        JSON.stringify({ port: 3002, token: "x" }),
+      );
+      fs.writeFileSync(path.join(registry, "notes.txt"), "not mine");
+      fs.writeFileSync(path.join(registry, "broken.json"), "{ half writ");
+
+      expect(endpoint.cleanupLegacyRegistry(registry)).toBe(1);
+      expect(fs.existsSync(path.join(registry, "3000.json"))).toBe(false);
+      expect(fs.existsSync(path.join(registry, "3001.json"))).toBe(true);
+      expect(fs.existsSync(path.join(registry, "3002.json"))).toBe(true);
+      expect(fs.existsSync(path.join(registry, "notes.txt"))).toBe(true);
+      expect(fs.existsSync(path.join(registry, "broken.json"))).toBe(true);
+    });
+
+    it("removes the legacy directory when no files remain", () => {
+      const registry = path.join(lumineHome, "mcp");
+      fs.mkdirSync(registry);
+      fs.writeFileSync(
+        path.join(registry, "3000.json"),
+        JSON.stringify({
+          port: 3000,
+          host: "127.0.0.1",
+          token: "x",
+          pid: process.pid,
+          updatedAt: Date.now(),
+        }),
+      );
+
+      expect(endpoint.cleanupLegacyRegistry(registry)).toBe(1);
+      expect(fs.existsSync(registry)).toBe(false);
     });
   });
 
@@ -58,24 +163,40 @@ describe("lumine-mcp", () => {
     // `Origin` is a forbidden header name to fetch(), which is running in a
     // renderer here — it will not send one however it is asked. A browser is
     // imitated at the socket instead.
-    const raw = (route, headers = {}) =>
+    const raw = (route, headers = {}, method = "GET", body = null) =>
       new Promise((resolve, reject) => {
         const request = require("http").request(
-          { host: "127.0.0.1", port: bridge.port, path: route, method: "GET", headers },
+          { host: "127.0.0.1", port: bridge.port, path: route, method, headers },
           (response) => {
             response.resume();
             response.on("end", () => resolve(response));
           },
         );
         request.on("error", reject);
+        if (body) request.write(body);
         request.end();
       });
 
+    const authorizationNotification = () =>
+      lumine.notifications
+        .getNotifications()
+        .find(
+          (notification) =>
+            !notification.isDismissed() && notification.getMessage().startsWith("Allow MCP client"),
+        );
+
+    const waitForAuthorizationNotification = async () => {
+      await conditionPromise(() => authorizationNotification());
+      return authorizationNotification();
+    };
+
     beforeEach(async () => {
+      jasmine.useRealClock();
       // Port 0 lets the OS assign a free ephemeral port: no CI collisions.
       bridge = await startBridge({ port: 0 });
       base = `http://127.0.0.1:${bridge.port}`;
       auth = { Authorization: `Bearer ${bridge.token}` };
+      lumine.notifications.clear();
     });
 
     afterEach(async () => {
@@ -131,30 +252,135 @@ describe("lumine-mcp", () => {
         const response = await raw("/health");
         expect(response.headers["access-control-allow-origin"]).toBeUndefined();
       });
+
+      it("refuses browser origins before offering authorization", async () => {
+        const response = await raw(
+          "/authorize",
+          { Origin: "https://evil.example", "Content-Type": "application/json" },
+          "POST",
+          JSON.stringify({ clientName: "Browser" }),
+        );
+        expect(response.statusCode).toBe(403);
+        expect(authorizationNotification()).toBeUndefined();
+      });
     });
 
-    describe("the endpoint registry", () => {
-      it("publishes the port and token while the bridge is up", () => {
-        const entries = endpoint.list();
-        expect(entries.length).toBe(1);
-        expect(entries[0].port).toBe(bridge.port);
-        expect(entries[0].token).toBe(bridge.token);
-        expect(fs.existsSync(endpoint.endpointPath(bridge.port))).toBe(true);
+    describe("authorization", () => {
+      const authorize = (clientName = "Spec client") =>
+        fetch(`${base}/authorize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientName }),
+        });
+
+      it("hands out the run token only after the user allows the named client", async () => {
+        const pending = authorize("Terminal agent");
+        const notification = await waitForAuthorizationNotification();
+
+        expect(notification.getDetail()).toContain("Terminal agent");
+        expect(notification.getDetail()).not.toContain(bridge.token);
+        expect(notification.getOptions().buttons.map((button) => button.text)).toEqual([
+          "Allow",
+          "Deny",
+        ]);
+
+        notification.getOptions().buttons[0].onDidClick();
+        const response = await pending;
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ authorized: true, token: bridge.token });
       });
 
-      it("withdraws the entry when the bridge stops", async () => {
-        const port = bridge.port;
+      it("returns 403 when the user denies the request", async () => {
+        const pending = authorize();
+        const notification = await waitForAuthorizationNotification();
+        notification.getOptions().buttons[1].onDidClick();
+
+        expect((await pending).status).toBe(403);
+      });
+
+      it("treats dismissing the notification as denial", async () => {
+        const pending = authorize();
+        const notification = await waitForAuthorizationNotification();
+        notification.dismiss();
+
+        expect((await pending).status).toBe(403);
+      });
+
+      it("allows only one pending request in this window", async () => {
+        const first = authorize("First client");
+        const notification = await waitForAuthorizationNotification();
+        const second = await authorize("Second client");
+
+        expect(second.status).toBe(409);
+        notification.getOptions().buttons[1].onDidClick();
+        expect((await first).status).toBe(403);
+      });
+
+      it("withdraws the prompt when the requesting client disconnects", async () => {
+        const controller = new AbortController();
+        const pending = fetch(`${base}/authorize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientName: "Gone client" }),
+          signal: controller.signal,
+        });
+        const notification = await waitForAuthorizationNotification();
+
+        controller.abort();
+        await expectAsync(pending).toBeRejected();
+        await conditionPromise(() => notification.isDismissed());
+
+        const next = authorize("Next client");
+        const nextNotification = await waitForAuthorizationNotification();
+        nextNotification.getOptions().buttons[1].onDidClick();
+        expect((await next).status).toBe(403);
+      });
+
+      it("returns 408 when approval times out", async () => {
         await stopBridge(bridge);
-        bridge = null;
-        expect(fs.existsSync(endpoint.endpointPath(port))).toBe(false);
-        expect(endpoint.list()).toEqual([]);
+        bridge = await startBridge({ port: 0, authorizationTimeoutMs: 5 });
+        base = `http://127.0.0.1:${bridge.port}`;
+        auth = { Authorization: `Bearer ${bridge.token}` };
+        lumine.notifications.clear();
+
+        expect((await authorize()).status).toBe(408);
       });
 
-      it("ignores a file that is not an endpoint", () => {
-        fs.writeFileSync(path.join(registry, "notes.txt"), "not mine");
-        fs.writeFileSync(path.join(registry, "broken.json"), "{ half writ");
-        expect(endpoint.list().length).toBe(1);
+      it("returns 503 when the bridge stops with a request pending", async () => {
+        const pending = authorize();
+        await waitForAuthorizationNotification();
+
+        const stopping = stopBridge(bridge);
+        bridge = null;
+        expect((await pending).status).toBe(503);
+        await stopping;
       });
+
+      it("rejects malformed authorization JSON without showing a prompt", async () => {
+        const response = await fetch(`${base}/authorize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{nope",
+        });
+
+        expect(response.status).toBe(400);
+        expect(authorizationNotification()).toBeUndefined();
+      });
+
+      it("rejects an oversized authorization request without showing a prompt", async () => {
+        const response = await fetch(`${base}/authorize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientName: "x".repeat(5000) }),
+        });
+
+        expect(response.status).toBe(400);
+        expect(authorizationNotification()).toBeUndefined();
+      });
+    });
+
+    it("does not create an endpoint registry", () => {
+      expect(fs.existsSync(path.join(lumineHome, "mcp"))).toBe(false);
     });
 
     it("lists enabled tools and hides blacklisted ones", async () => {
@@ -383,11 +609,21 @@ describe("lumine-mcp", () => {
       expect(tools.map((t) => t.name)).not.toContain("SpecTool");
     });
 
-    // The stdio shim used to answer `initialize` and `tools/list` out of its
-    // own copy of the protocol, which drifted from the bridge's. It forwards
-    // now, and these hold it to that: whatever the bridge says, it says.
+    it("reserves ConnectToLumine against external providers", async () => {
+      const disposable = mainModule.consumeMcpTools([
+        { name: "ConnectToLumine", execute: () => ({ token: "not allowed" }) },
+      ]);
+
+      const { tools } = await (await get("/tools")).json();
+      expect(tools.map((tool) => tool.name)).not.toContain("ConnectToLumine");
+      disposable.dispose();
+    });
+
+    // The shim owns the host-facing lifecycle so it can offer a connector
+    // before any editor has been selected. Its hidden bridge session begins
+    // only after that window's user approves it.
     describe("the stdio server", () => {
-      let server, lines, pending, httpSession;
+      let server, lines, pending, notifications, notificationWaiters, httpSession, nextId;
 
       const ask = (message) => {
         const answer = new Promise((resolve) => pending.push(resolve));
@@ -395,9 +631,14 @@ describe("lumine-mcp", () => {
         return answer;
       };
 
-      // The shim's opposite number: the same conversation held directly, so
-      // the two can be compared message for message. It keeps its own session
-      // for the same reason the shim keeps one.
+      const tell = (message) => server.stdin.write(JSON.stringify(message) + "\n");
+
+      const waitForNotification = (method) => {
+        const existing = notifications.findIndex((message) => message.method === method);
+        if (existing !== -1) return Promise.resolve(notifications.splice(existing, 1)[0]);
+        return new Promise((resolve) => notificationWaiters.push({ method, resolve }));
+      };
+
       const overHttp = async (message) => {
         const headers = { ...auth, "Content-Type": "application/json" };
         if (httpSession) headers["Mcp-Session-Id"] = httpSession;
@@ -418,8 +659,6 @@ describe("lumine-mcp", () => {
         params: { protocolVersion: "2025-11-25", clientInfo: { name: "spec" } },
       };
 
-      // The port pins the shim to this bridge; the token is deliberately not
-      // passed, so every run exercises the registry lookup that finds it.
       const spawnServer = (env = {}) => {
         const child = require("child_process").spawn(
           process.execPath,
@@ -428,8 +667,10 @@ describe("lumine-mcp", () => {
             env: {
               ...process.env,
               ELECTRON_RUN_AS_NODE: "1",
-              LUMINE_BRIDGE_HOST: "127.0.0.1",
               LUMINE_BRIDGE_PORT: String(bridge.port),
+              // Deliberately present: credentials inherited from an old setup
+              // must never bypass the new approval flow.
+              LUMINE_BRIDGE_TOKEN: bridge.token,
               ...env,
             },
             stdio: ["pipe", "pipe", "pipe"],
@@ -438,51 +679,157 @@ describe("lumine-mcp", () => {
         require("readline")
           .createInterface({ input: child.stdout })
           .on("line", (line) => {
-            lines.push(JSON.parse(line));
-            pending.shift()?.(lines[lines.length - 1]);
+            const message = JSON.parse(line);
+            lines.push(message);
+            if (message.method && message.id === undefined) {
+              const waiter = notificationWaiters.findIndex(
+                (candidate) => candidate.method === message.method,
+              );
+              if (waiter === -1) notifications.push(message);
+              else notificationWaiters.splice(waiter, 1)[0].resolve(message);
+            } else {
+              pending.shift()?.(message);
+            }
           });
         return child;
+      };
+
+      const stopServer = async () => {
+        if (!server) return;
+        const child = server;
+        server = null;
+        child.stdin.end();
+        await new Promise((resolve) => child.once("exit", resolve));
+      };
+
+      const restartServer = async (env = {}) => {
+        await stopServer();
+        lines = [];
+        pending = [];
+        notifications = [];
+        notificationWaiters = [];
+        server = spawnServer(env);
+      };
+
+      const initializeShim = async () => {
+        const answer = await ask(INITIALIZE);
+        tell({ jsonrpc: "2.0", method: "notifications/initialized" });
+        return answer;
+      };
+
+      const connectShim = async ({ port, allow = true } = {}) => {
+        const id = nextId++;
+        const connecting = ask({
+          jsonrpc: "2.0",
+          id,
+          method: "tools/call",
+          params: {
+            name: "ConnectToLumine",
+            arguments: port === undefined ? {} : { port },
+          },
+        });
+        const notification = await waitForAuthorizationNotification();
+        notification.getOptions().buttons[allow ? 0 : 1].onDidClick();
+        return connecting;
       };
 
       beforeEach(() => {
         jasmine.useRealClock();
         lines = [];
         pending = [];
+        notifications = [];
+        notificationWaiters = [];
         httpSession = null;
+        nextId = 10;
         server = spawnServer();
       });
 
-      afterEach(async () => {
-        server.stdin.end();
-        await new Promise((resolve) => server.once("exit", resolve));
-      });
+      afterEach(() => stopServer());
 
       it("answers initialize exactly as the bridge does", async () => {
         expect(await ask(INITIALIZE)).toEqual(await overHttp(INITIALIZE));
       });
 
-      it("answers tools/list exactly as the bridge does", async () => {
-        // tools/list belongs to a session now, and each side opens its own.
-        await ask(INITIALIZE);
-        await overHttp(INITIALIZE);
-        const message = { jsonrpc: "2.0", id: 2, method: "tools/list" };
-        expect(await ask(message)).toEqual(await overHttp(message));
-      });
-
-      // The shim holds the session for the host, which never sees one.
-      it("carries the session it was given through to the next request", async () => {
-        await ask(INITIALIZE);
+      it("starts disconnected with only ConnectToLumine", async () => {
+        await initializeShim();
         const answer = await ask({ jsonrpc: "2.0", id: 2, method: "tools/list" });
-        expect(answer.result.tools.length).toBeGreaterThan(0);
+
+        expect(answer.result.tools.map((tool) => tool.name)).toEqual(["ConnectToLumine"]);
+        expect(authorizationNotification()).toBeUndefined();
       });
 
-      // Nothing the host sent asked for this: it starts at the bridge.
-      it("relays a notification the bridge starts", async () => {
-        await ask(INITIALIZE);
-        const relayed = new Promise((resolve) => pending.push(resolve));
-        // The shim opens its stream once initialize is answered, which is a
-        // round trip behind the answer the host already has.
+      it("uses the terminal port only as the default for an approved connection", async () => {
+        await initializeShim();
+        const connected = await connectShim();
+        expect(connected.result.isError).toBe(false);
+        expect(connected.result.content[0].text).toContain(String(bridge.port));
+
+        const answer = await ask({ jsonrpc: "2.0", id: 3, method: "tools/list" });
+        const names = answer.result.tools.map((tool) => tool.name);
+        expect(names[0]).toBe("ConnectToLumine");
+        expect(names).toContain("GetActiveEditor");
+        expect(JSON.stringify(lines)).not.toContain(bridge.token);
+      });
+
+      it("requires an explicit port without the terminal environment", async () => {
+        await restartServer({ LUMINE_BRIDGE_PORT: "", LUMINE_BRIDGE_TOKEN: bridge.token });
+        await initializeShim();
+
+        const missing = await ask({
+          jsonrpc: "2.0",
+          id: 4,
+          method: "tools/call",
+          params: { name: "ConnectToLumine", arguments: {} },
+        });
+        expect(missing.result.isError).toBe(true);
+        expect(authorizationNotification()).toBeUndefined();
+
+        const connected = await connectShim({ port: bridge.port });
+        expect(connected.result.isError).toBe(false);
+      });
+
+      it("keeps the current window when a switch is denied", async () => {
+        const otherBridge = await startBridge({ port: 0 });
+        try {
+          await initializeShim();
+          await connectShim();
+          const denied = await connectShim({ port: otherBridge.port, allow: false });
+
+          expect(denied.result.isError).toBe(true);
+          const answer = await ask({ jsonrpc: "2.0", id: 5, method: "tools/list" });
+          expect(answer.result.tools.map((tool) => tool.name)).toContain("GetActiveEditor");
+        } finally {
+          await stopBridge(otherBridge);
+        }
+      });
+
+      it("switches to another approved window and does not fall back when it closes", async () => {
+        let otherBridge = await startBridge({ port: 0 });
+        try {
+          await initializeShim();
+          await connectShim();
+          const switched = await connectShim({ port: otherBridge.port });
+          expect(switched.result.content[0].text).toContain("Switched");
+
+          await waitForNotification("notifications/tools/list_changed");
+          const changed = waitForNotification("notifications/tools/list_changed");
+          await stopBridge(otherBridge);
+          otherBridge = null;
+          await changed;
+
+          const answer = await ask({ jsonrpc: "2.0", id: 6, method: "tools/list" });
+          expect(answer.result.tools.map((tool) => tool.name)).toEqual(["ConnectToLumine"]);
+        } finally {
+          if (otherBridge) await stopBridge(otherBridge);
+        }
+      });
+
+      it("relays notifications from the selected bridge", async () => {
+        await initializeShim();
+        await connectShim();
+        await waitForNotification("notifications/tools/list_changed");
         await conditionPromise(() => openStreamCount() > 0);
+        const relayed = waitForNotification("notifications/tools/list_changed");
         setExternalTools(new Map([["SpecTool", { name: "SpecTool", execute: () => null }]]));
         expect(await relayed).toEqual({
           jsonrpc: "2.0",
@@ -490,8 +837,7 @@ describe("lumine-mcp", () => {
         });
       });
 
-      // Neither of these reached the old shim's own switch statement.
-      it("answers ping, which it never used to implement", async () => {
+      it("answers ping without selecting a window", async () => {
         const answer = await ask({ jsonrpc: "2.0", id: 3, method: "ping" });
         expect(answer).toEqual({ jsonrpc: "2.0", id: 3, result: {} });
       });
@@ -508,9 +854,7 @@ describe("lumine-mcp", () => {
       });
 
       it("says nothing back to a notification", async () => {
-        server.stdin.write(
-          JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n",
-        );
+        tell({ jsonrpc: "2.0", method: "notifications/initialized" });
         expect(await ask({ jsonrpc: "2.0", id: 6, method: "ping" })).toEqual({
           jsonrpc: "2.0",
           id: 6,
@@ -525,43 +869,22 @@ describe("lumine-mcp", () => {
         expect((await answer).error.code).toBe(-32700);
       });
 
-      // No port, no token: it has only the registry to go on.
-      describe("finding the editor on its own", () => {
-        beforeEach(async () => {
-          server.stdin.end();
-          await new Promise((resolve) => server.once("exit", resolve));
-          lines = [];
-          pending = [];
-          server = spawnServer({ LUMINE_BRIDGE_PORT: "" });
+      it("cancels a pending approval when the MCP host exits", async () => {
+        await initializeShim();
+        ask({
+          jsonrpc: "2.0",
+          id: 20,
+          method: "tools/call",
+          params: { name: "ConnectToLumine", arguments: {} },
         });
+        const notification = await waitForAuthorizationNotification();
+        const child = server;
+        server = null;
 
-        it("discovers the running bridge through the registry", async () => {
-          const answer = await ask({ jsonrpc: "2.0", id: 7, method: "ping" });
-          expect(answer).toEqual({ jsonrpc: "2.0", id: 7, result: {} });
-        });
-      });
-
-      describe("with no bridge to find", () => {
-        let empty;
-
-        beforeEach(async () => {
-          server.stdin.end();
-          await new Promise((resolve) => server.once("exit", resolve));
-          lines = [];
-          pending = [];
-          empty = fs.mkdtempSync(path.join(os.tmpdir(), "lumine-mcp-empty-"));
-          server = spawnServer({ LUMINE_BRIDGE_PORT: "", LUMINE_MCP_REGISTRY: empty });
-        });
-
-        afterEach(() => {
-          fs.rmSync(empty, { recursive: true, force: true, maxRetries: 3 });
-        });
-
-        it("says so rather than leaving the host waiting", async () => {
-          const answer = await ask({ jsonrpc: "2.0", id: 8, method: "ping" });
-          expect(answer.error.code).toBe(-32603);
-          expect(answer.error.message).toContain("No Lumine bridge is running");
-        });
+        const exited = new Promise((resolve) => child.once("exit", resolve));
+        child.stdin.end();
+        await exited;
+        await conditionPromise(() => notification.isDismissed());
       });
     });
   });
