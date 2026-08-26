@@ -81,7 +81,7 @@ describe("lumine-mcp builtin tools", () => {
     it("reads a modified buffer the user is not looking at", async () => {
       const answer = await run("ReadText", { path: otherPath });
       expect(answer.content).toBe("in the buffer\n");
-      expect(answer.modified).toBe(true);
+      expect(answer.fileState).toBe("modified");
       expect(answer.path).toBe(otherPath);
       expect(fs.readFileSync(otherPath, "utf8")).toBe("on disk\n");
     });
@@ -91,7 +91,7 @@ describe("lumine-mcp builtin tools", () => {
     });
 
     it("reports a buffer that matches its file as unmodified", async () => {
-      expect((await run("ReadText", { path: filePath })).modified).toBe(false);
+      expect((await run("ReadText", { path: filePath })).fileState).toBe("unmodified");
     });
 
     it("writes into a buffer the user is not looking at", async () => {
@@ -116,7 +116,9 @@ describe("lumine-mcp builtin tools", () => {
 
     // GetOpenEditors is where a caller learns it must not read from disk.
     it("reports which open files hold unsaved work", async () => {
-      const dirty = (await run("GetOpenEditors")).filter((editor) => editor.modified);
+      const dirty = (await run("GetOpenEditors")).filter(
+        (editor) => editor.fileState !== "unmodified",
+      );
       expect(dirty.map((editor) => editor.path)).toEqual([otherPath]);
     });
   });

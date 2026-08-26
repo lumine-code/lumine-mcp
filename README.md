@@ -38,7 +38,7 @@ Commands available in `.lumine-mcp`:
 
 | Tool                | Description                                                                             | Default  |
 | ------------------- | --------------------------------------------------------------------------------------- | -------- |
-| `GetActiveEditor`   | Get editor metadata (path, grammar, modified, lineCount)                                | Enabled  |
+| `GetActiveEditor`   | Get editor metadata (path, grammar, fileState, lineCount)                               | Enabled  |
 | `GetOpenEditors`    | Get metadata for all open text editors                                                  | Enabled  |
 | `ReadText`          | Read an open editor's buffer, including unsaved changes the file on disk does not have  | Enabled  |
 | `WriteText`         | Write into an open editor's buffer, leaving the change unsaved for review               | Enabled  |
@@ -53,7 +53,7 @@ Commands available in `.lumine-mcp`:
 
 A tool that takes a `path` matches it the way the filesystem does — case-insensitively and separator-agnostically on Windows, exactly on POSIX — and resolves a relative one against the project roots.
 
-An assistant brings its own file tools, its own search and its own shell, and they are better than anything here at reading a file off disk. `ReadText` and `WriteText` are for the case those tools get wrong: a buffer with unsaved changes, where the disk holds something the user has already moved past. `GetOpenEditors` is what reveals it, reporting `modified` per file.
+An assistant brings its own file tools, its own search and its own shell, and they are better than anything here at reading a file off disk. `ReadText` and `WriteText` are for the cases those tools get wrong: an open document whose `fileState` is `modified`, `conflicted`, or `removed`, where the disk does not hold what the user sees. `GetOpenEditors` reports that state for every editor.
 
 Which tools are on is a list plus a mode. Under a **blacklist**, everything is on except what is listed, and a tool registered later arrives on; under a **greenlist**, only what is listed is on, and a tool registered later arrives off. Switching mode inverts the list with it, so the same tools stay on and only the default for a newcomer changes.
 
