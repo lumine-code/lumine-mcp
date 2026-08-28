@@ -29,6 +29,7 @@ Commands available in `lumine-workspace`:
 
 Commands available in `.lumine-mcp`:
 
+- `lumine-mcp:toggle-selected-tool`: enable or disable the selected tool,
 - `lumine-mcp:toggle-mode`: switch blacklist/greenlist mode,
 - `lumine-mcp:enable-all`: enable all tools,
 - `lumine-mcp:disable-all`: disable all tools,
