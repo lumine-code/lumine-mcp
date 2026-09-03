@@ -15,9 +15,10 @@ describe("lumine-mcp item actions", () => {
     await lumine.packages.deactivatePackage("lumine-mcp");
   });
 
-  it("derives its actions from the command registrations and the keymap", () => {
+  it("derives its actions from the command registrations and the keymap", async () => {
     const tool = { name: "ReadText", description: "Read an open editor." };
     view.getTools = () => [tool];
+    await view.selectListHost.show();
     view.selectList.setItems([tool]);
     const actions = view.selectList.getAvailableActions();
     const byCommand = new Map(actions.map((action) => [action.command, action]));
@@ -86,9 +87,9 @@ describe("lumine-mcp item actions", () => {
 
   it("shows the actions as a flow step and runs one against the master list", async () => {
     view.getTools = () => [{ name: "ReadText", description: "Read an open editor." }];
-    view.selectList.show();
+    view.selectListHost.show();
 
-    await view.selectList.showActions();
+    await view.selectListHost.showActions();
 
     expect(lumine.workspace.getModalTrail()).toEqual(["MCP Tools", "Actions"]);
 
@@ -97,6 +98,6 @@ describe("lumine-mcp item actions", () => {
     await view.selectList.runAction("lumine-mcp:toggle-mode");
 
     expect(spy).toHaveBeenCalled();
-    expect(view.selectList.isVisible()).toBeTruthy();
+    expect(view.selectListHost.isVisible()).toBeTruthy();
   });
 });
