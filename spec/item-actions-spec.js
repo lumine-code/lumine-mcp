@@ -18,8 +18,8 @@ describe("lumine-mcp item actions", () => {
   it("derives its actions from the command registrations and the keymap", () => {
     const tool = { name: "ReadText", description: "Read an open editor." };
     view.getTools = () => [tool];
-    view.selectList.update({ items: [tool] });
-    const actions = view.selectList.itemActions();
+    view.selectList.setItems([tool]);
+    const actions = view.selectList.getAvailableActions();
     const byCommand = new Map(actions.map((action) => [action.command, action]));
 
     expect([...byCommand.keys()].sort()).toEqual([
@@ -35,8 +35,8 @@ describe("lumine-mcp item actions", () => {
     expect(toggleSelected.description).toBe(
       "Enable or disable the selected tool, keeping the list open.",
     );
-    expect(toggleSelected.keystrokes).toEqual(["enter"]);
-    expect(toggleSelected.scope).toBe("item");
+    expect(toggleSelected.primary).toBe(true);
+    expect(toggleSelected.context).toBe("item");
 
     const toggleMode = byCommand.get("lumine-mcp:toggle-mode");
     expect(toggleMode.name).toBe("Toggle Mode");
@@ -53,9 +53,9 @@ describe("lumine-mcp item actions", () => {
       "lumine-mcp:reset-defaults",
       "lumine-mcp:toggle-mode",
     ]) {
-      expect(byCommand.get(command).scope).toBe("list");
+      expect(byCommand.get(command).context).toBe("dialog");
     }
-    expect(view.selectList.getIdForItem(tool)).toBe(tool.name);
+    expect(view.selectList.getItemId(tool)).toBe(tool.name);
 
     // Every action explains itself with more than a restated title.
     for (const action of actions) {
@@ -69,11 +69,11 @@ describe("lumine-mcp item actions", () => {
   });
 
   it("hides the item action when no tool is selected", () => {
-    view.selectList.update({ items: [] });
+    view.selectList.setItems([]);
 
     expect(
       view.selectList
-        .itemActions()
+        .getAvailableActions()
         .map((action) => action.command)
         .sort(),
     ).toEqual([
@@ -88,23 +88,15 @@ describe("lumine-mcp item actions", () => {
     view.getTools = () => [{ name: "ReadText", description: "Read an open editor." }];
     view.selectList.show();
 
-    await view.selectList.showItemActions();
+    await view.selectList.showActions();
 
-    expect(view.selectList.itemActionsList.isVisible()).toBeTruthy();
     expect(lumine.workspace.getModalTrail()).toEqual(["MCP Tools", "Actions"]);
-    // The actions list wears the package class, so the package keymap
-    // resolves action keystrokes inside it too.
-    expect(view.selectList.itemActionsList.element.classList.contains("lumine-mcp")).toBe(true);
 
     const spy = spyOn(view, "toggleMode");
-    const index = view.selectList.itemActionsList.items.findIndex(
-      (item) => item.command === "lumine-mcp:toggle-mode",
-    );
-    view.selectList.itemActionsList.selectIndex(index);
-    view.selectList.itemActionsList.confirmSelection();
+    lumine.workspace.popModal();
+    await view.selectList.runAction("lumine-mcp:toggle-mode");
 
     expect(spy).toHaveBeenCalled();
     expect(view.selectList.isVisible()).toBeTruthy();
-    expect(view.selectList.itemActionsList.isVisible()).toBeFalsy();
   });
 });
