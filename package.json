@@ -110,5 +110,20 @@
     "eslint-plugin-n": "^18.3.0",
     "globals": "^17.11.0",
     "prettier": "^3.9.6"
+  },
+  "activationCommands": {
+    "lumine-workspace": [
+      "lumine-mcp:disable-all",
+      "lumine-mcp:enable-all",
+      "lumine-mcp:register-to-claude",
+      "lumine-mcp:register-to-codex",
+      "lumine-mcp:reset-defaults",
+      "lumine-mcp:start",
+      "lumine-mcp:status",
+      "lumine-mcp:stop",
+      "lumine-mcp:toggle-mode",
+      "lumine-mcp:toggle-selected-tool",
+      "lumine-mcp:toggle-tools"
+    ]
   }
 }
