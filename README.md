@@ -60,10 +60,9 @@ Which tools are on is a list plus a mode. Under a **blacklist**, everything is o
 
 ## Tools from other packages
 
-Any package can publish tools of its own through the `mcp.tools` service, and they appear in the same list. Two do today:
+Any package can publish tools of its own through the `mcp.tools` service, and they appear in the same list. One does today:
 
 - **linter** — `GetLinterMessages`, the diagnostics as the editor has them, filterable by file, severity and provider.
-- **jupyter-repl** — `JupyterListKernels`, `JupyterExecute`, `JupyterInspect`, `JupyterInterrupt` and `JupyterRestart`, for the live kernel session. `JupyterExecute` and `JupyterRestart` are disabled by default: one runs code in the user's own session and the other discards it.
 
 ## MCP Client Integration
 
