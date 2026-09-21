@@ -6,8 +6,8 @@ describe("lumine-mcp item actions", () => {
     // Keep the bridge from grabbing a real port on activation.
     lumine.config.set("lumine-mcp.autoStart", false);
     const activation = lumine.packages.activatePackage("lumine-mcp");
-    lumine.packages.triggerDeferredActivationHooks();
-    lumine.packages.triggerActivationHook("core:loaded-shell-environment");
+    Promise.resolve();
+    lumine.hooks.trigger("core:loaded-shell-environment");
     view = (await activation).mainModule.toggleToolsView;
   });
 

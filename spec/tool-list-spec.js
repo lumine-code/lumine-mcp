@@ -28,8 +28,8 @@ describe("lumine-mcp tool list", () => {
     jasmine.attachToDOM(lumine.views.getView(lumine.workspace));
     lumine.config.set("lumine-mcp.autoStart", false);
     const activation = lumine.packages.activatePackage("lumine-mcp");
-    lumine.packages.triggerDeferredActivationHooks();
-    lumine.packages.triggerActivationHook("core:loaded-shell-environment");
+    Promise.resolve();
+    lumine.hooks.trigger("core:loaded-shell-environment");
     view = (await activation).mainModule.toggleToolsView;
 
     bridge = await startBridge({ port: 0 });

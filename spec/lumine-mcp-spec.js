@@ -1,11 +1,10 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { startBridge, stopBridge, setExternalTools, openStreamCount } = require("../lib/bridge");
 const endpoint = require("../lib/endpoint");
 
 describe("lumine-mcp", () => {
-  let mainModule, lumineHome, originalLumineHome;
+  let mainModule, bridgeApi, lumineHome, originalLumineHome;
 
   beforeEach(async () => {
     // Migration reads LUMINE_HOME afresh. Point it at scratch space so package
@@ -17,9 +16,10 @@ describe("lumine-mcp", () => {
     // Keep the bridge from grabbing a real port on activation.
     lumine.config.set("lumine-mcp.autoStart", false);
     const activation = lumine.packages.activatePackage("lumine-mcp");
-    lumine.packages.triggerDeferredActivationHooks();
-    lumine.packages.triggerActivationHook("core:loaded-shell-environment");
+    Promise.resolve();
+    lumine.hooks.trigger("core:loaded-shell-environment");
     mainModule = (await activation).mainModule;
+    bridgeApi = require("../lib/bridge");
   });
 
   afterEach(() => {
@@ -193,16 +193,16 @@ describe("lumine-mcp", () => {
     beforeEach(async () => {
       jasmine.useRealClock();
       // Port 0 lets the OS assign a free ephemeral port: no CI collisions.
-      bridge = await startBridge({ port: 0 });
+      bridge = await bridgeApi.startBridge({ port: 0 });
       base = `http://127.0.0.1:${bridge.port}`;
       auth = { Authorization: `Bearer ${bridge.token}` };
       lumine.notifications.clear();
     });
 
     afterEach(async () => {
-      setExternalTools(new Map());
+      bridgeApi.setExternalTools(new Map());
       if (bridge) {
-        await stopBridge(bridge);
+        await bridgeApi.stopBridge(bridge);
         bridge = null;
       }
     });
@@ -337,8 +337,8 @@ describe("lumine-mcp", () => {
       });
 
       it("returns 408 when approval times out", async () => {
-        await stopBridge(bridge);
-        bridge = await startBridge({ port: 0, authorizationTimeoutMs: 5 });
+        await bridgeApi.stopBridge(bridge);
+        bridge = await bridgeApi.startBridge({ port: 0, authorizationTimeoutMs: 5 });
         base = `http://127.0.0.1:${bridge.port}`;
         auth = { Authorization: `Bearer ${bridge.token}` };
         lumine.notifications.clear();
@@ -350,7 +350,7 @@ describe("lumine-mcp", () => {
         const pending = authorize();
         await waitForAuthorizationNotification();
 
-        const stopping = stopBridge(bridge);
+        const stopping = bridgeApi.stopBridge(bridge);
         bridge = null;
         expect((await pending).status).toBe(503);
         await stopping;
@@ -538,7 +538,9 @@ describe("lumine-mcp", () => {
         });
 
         it("says when a package registers a tool", async () => {
-          setExternalTools(new Map([["SpecTool", { name: "SpecTool", execute: () => null }]]));
+          bridgeApi.setExternalTools(
+            new Map([["SpecTool", { name: "SpecTool", execute: () => null }]]),
+          );
           await conditionPromise(() => text().includes("notifications/tools/list_changed"));
         });
 
@@ -789,7 +791,7 @@ describe("lumine-mcp", () => {
       });
 
       it("keeps the current window when a switch is denied", async () => {
-        const otherBridge = await startBridge({ port: 0 });
+        const otherBridge = await bridgeApi.startBridge({ port: 0 });
         try {
           await initializeShim();
           await connectShim();
@@ -799,12 +801,12 @@ describe("lumine-mcp", () => {
           const answer = await ask({ jsonrpc: "2.0", id: 5, method: "tools/list" });
           expect(answer.result.tools.map((tool) => tool.name)).toContain("GetActiveEditor");
         } finally {
-          await stopBridge(otherBridge);
+          await bridgeApi.stopBridge(otherBridge);
         }
       });
 
       it("switches to another approved window and does not fall back when it closes", async () => {
-        let otherBridge = await startBridge({ port: 0 });
+        let otherBridge = await bridgeApi.startBridge({ port: 0 });
         try {
           await initializeShim();
           await connectShim();
@@ -813,14 +815,14 @@ describe("lumine-mcp", () => {
 
           await waitForNotification("notifications/tools/list_changed");
           const changed = waitForNotification("notifications/tools/list_changed");
-          await stopBridge(otherBridge);
+          await bridgeApi.stopBridge(otherBridge);
           otherBridge = null;
           await changed;
 
           const answer = await ask({ jsonrpc: "2.0", id: 6, method: "tools/list" });
           expect(answer.result.tools.map((tool) => tool.name)).toEqual(["ConnectToLumine"]);
         } finally {
-          if (otherBridge) await stopBridge(otherBridge);
+          if (otherBridge) await bridgeApi.stopBridge(otherBridge);
         }
       });
 
@@ -828,9 +830,11 @@ describe("lumine-mcp", () => {
         await initializeShim();
         await connectShim();
         await waitForNotification("notifications/tools/list_changed");
-        await conditionPromise(() => openStreamCount() > 0);
+        await conditionPromise(() => bridgeApi.openStreamCount() > 0);
         const relayed = waitForNotification("notifications/tools/list_changed");
-        setExternalTools(new Map([["SpecTool", { name: "SpecTool", execute: () => null }]]));
+        bridgeApi.setExternalTools(
+          new Map([["SpecTool", { name: "SpecTool", execute: () => null }]]),
+        );
         expect(await relayed).toEqual({
           jsonrpc: "2.0",
           method: "notifications/tools/list_changed",
