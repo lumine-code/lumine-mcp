@@ -10,7 +10,8 @@ Model Context Protocol server exposing editor tools to AI assistants.
 - **Editor tools**: get/set content, open/save files, manage selections.
 - **Extensible**: other packages can register tools via `mcp.tools` service.
 - **Live tool list**: clients are told when tools are registered, withdrawn, or switched off.
-- **Toggle tools**: enable/disable individual tools via select list. Destructive tools disabled by default.
+- **Request lifecycle**: observation waits allow concurrent calls, cancellation releases their resources, and object results include structured content.
+- **Toggle tools**: enable/disable individual tools via select list; tab and project removal tools are disabled by default.
 
 ## Installation
 

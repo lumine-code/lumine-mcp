@@ -87,6 +87,8 @@ jobs:
       - name: Rebuild native modules for Electron
         working-directory: lumine
         run: npm run build
+      - name: Provision Jupyter integration peers
+        run: node lumine/script/install-spec-packages.js --package lumine-mcp --home "$RUNNER_TEMP/lumine-mcp-spec-home" --github-env "$GITHUB_ENV"
       - name: Run the Jasmine spec suite
         working-directory: lumine
         timeout-minutes: 20

@@ -21,6 +21,12 @@
   "engines": {
     "lumine": "^1.0.0"
   },
+  "specPackages": [
+    "jupyter-view",
+    "jupyter-repl",
+    "jupyter-variables",
+    "jupyter-watches"
+  ],
   "main": "./lib/main",
   "files": [
     "docs",

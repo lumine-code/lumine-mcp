@@ -611,6 +611,157 @@ describe("lumine-mcp", () => {
       expect(tools.map((t) => t.name)).not.toContain("SpecTool");
     });
 
+    describe("request-scoped observation", () => {
+      let session;
+      const rpc = (body, signal, targetSession = session) =>
+        fetch(`${base}/mcp`, {
+          method: "POST",
+          signal,
+          headers: { ...auth, "Content-Type": "application/json", "Mcp-Session-Id": targetSession },
+          body: JSON.stringify(body),
+        });
+      const waitCall = (id) => ({
+        jsonrpc: "2.0",
+        id,
+        method: "tools/call",
+        params: { name: "WaitSpec", arguments: {} },
+      });
+      beforeEach(async () => {
+        const init = await post("/mcp", {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2025-11-25" },
+        });
+        session = init.headers.get("mcp-session-id");
+      });
+
+      function registerWait() {
+        let context;
+        bridgeApi.setExternalTools(
+          new Map([
+            [
+              "WaitSpec",
+              {
+                name: "WaitSpec",
+                execute: (_args, nextContext) => {
+                  context = nextContext;
+                  return new Promise((resolve) =>
+                    context.signal.addEventListener("abort", () => resolve({ cancelled: true }), {
+                      once: true,
+                    }),
+                  );
+                },
+              },
+            ],
+          ]),
+        );
+        return () => context;
+      }
+
+      it("returns object results as structured MCP content alongside JSON text", async () => {
+        bridgeApi.setExternalTools(
+          new Map([
+            [
+              "WaitSpec",
+              { name: "WaitSpec", execute: () => ({ executionId: "e1", status: "queued" }) },
+            ],
+          ]),
+        );
+        const answer = await (await rpc(waitCall(2))).json();
+        expect(answer.result.structuredContent).toEqual({ executionId: "e1", status: "queued" });
+        expect(JSON.parse(answer.result.content[0].text)).toEqual(answer.result.structuredContent);
+      });
+
+      it("keeps text compatibility for clients negotiating the oldest protocol", async () => {
+        const initialized = await post("/mcp", {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2025-03-26" },
+        });
+        const oldSession = initialized.headers.get("mcp-session-id");
+        bridgeApi.setExternalTools(
+          new Map([["WaitSpec", { name: "WaitSpec", execute: () => ({ status: "ready" }) }]]),
+        );
+        const answer = await (await rpc(waitCall(2), undefined, oldSession)).json();
+        expect(answer.result.structuredContent).toBeUndefined();
+        expect(JSON.parse(answer.result.content[0].text)).toEqual({ status: "ready" });
+      });
+
+      it("ignores malformed cancellation parameters without affecting active work", async () => {
+        const context = registerWait();
+        const pendingCall = rpc(waitCall(2));
+        await conditionPromise(() => context());
+        expect(
+          (await rpc({ jsonrpc: "2.0", method: "notifications/cancelled", params: null })).status,
+        ).toBe(202);
+        expect(context().signal.aborted).toBeFalse();
+        await rpc({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 2 } });
+        expect((await pendingCall).status).toBe(202);
+      });
+
+      it("cancels only the requesting session and leaves later calls available", async () => {
+        const context = registerWait();
+        const pendingCall = rpc(waitCall(2));
+        await conditionPromise(() => context());
+        const otherInit = await post("/mcp", {
+          jsonrpc: "2.0",
+          id: 3,
+          method: "initialize",
+          params: {},
+        });
+        const otherSession = otherInit.headers.get("mcp-session-id");
+        await rpc(
+          { jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 2 } },
+          undefined,
+          otherSession,
+        );
+        expect(context().signal.aborted).toBeFalse();
+        await rpc({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 2 } });
+        expect((await pendingCall).status).toBe(202);
+        expect(context().signal.aborted).toBeTrue();
+        expect((await rpc({ jsonrpc: "2.0", id: 4, method: "ping" })).status).toBe(200);
+      });
+
+      it("aborts observation when its HTTP caller disconnects", async () => {
+        const context = registerWait();
+        const controller = new AbortController();
+        const pendingCall = rpc(waitCall(2), controller.signal).catch(() => null);
+        await conditionPromise(() => context());
+        controller.abort();
+        await pendingCall;
+        await conditionPromise(() => context().signal.aborted);
+      });
+
+      it("retires observations when their provider is replaced", async () => {
+        const context = registerWait();
+        const pendingCall = rpc(waitCall(2));
+        await conditionPromise(() => context());
+        bridgeApi.setExternalTools(
+          new Map([["WaitSpec", { name: "WaitSpec", execute: () => ({ generation: "new" }) }]]),
+        );
+        expect((await pendingCall).status).toBe(202);
+        expect(context().signal.aborted).toBeTrue();
+        expect((await (await rpc(waitCall(3))).json()).result.structuredContent.generation).toBe(
+          "new",
+        );
+      });
+
+      it("ends session observations before completing DELETE", async () => {
+        const context = registerWait();
+        const pendingCall = rpc(waitCall(2));
+        await conditionPromise(() => context());
+        const response = await fetch(`${base}/mcp`, {
+          method: "DELETE",
+          headers: { ...auth, "Mcp-Session-Id": session },
+        });
+        expect(response.status).toBe(204);
+        expect((await pendingCall).status).toBe(202);
+        expect(context().signal.aborted).toBeTrue();
+      });
+    });
+
     it("reserves ConnectToLumine against external providers", async () => {
       const disposable = mainModule.consumeMcpTools([
         { name: "ConnectToLumine", execute: () => ({ token: "not allowed" }) },
@@ -734,6 +885,45 @@ describe("lumine-mcp", () => {
         notification.getOptions().buttons[allow ? 0 : 1].onDidClick();
         return connecting;
       };
+
+      it("keeps stdio requests and cancellation flowing while an observation waits", async () => {
+        await initializeShim();
+        await connectShim();
+        let context;
+        bridgeApi.setExternalTools(
+          new Map([
+            [
+              "WaitSpec",
+              {
+                name: "WaitSpec",
+                execute: (_args, nextContext) => {
+                  context = nextContext;
+                  return new Promise((resolve) =>
+                    context.signal.addEventListener("abort", () => resolve({ cancelled: true }), {
+                      once: true,
+                    }),
+                  );
+                },
+              },
+            ],
+          ]),
+        );
+        const waitId = nextId++;
+        tell({
+          jsonrpc: "2.0",
+          id: waitId,
+          method: "tools/call",
+          params: { name: "WaitSpec", arguments: {} },
+        });
+        await conditionPromise(() => context);
+        const pingId = nextId++;
+        expect((await ask({ jsonrpc: "2.0", id: pingId, method: "ping" })).id).toBe(pingId);
+        tell({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: waitId } });
+        await conditionPromise(() => context.signal.aborted);
+        const listing = await ask({ jsonrpc: "2.0", id: nextId++, method: "tools/list" });
+        expect(listing.result.tools.some((tool) => tool.name === "WaitSpec")).toBeTrue();
+        expect(lines.some((message) => message.id === waitId)).toBeFalse();
+      });
 
       beforeEach(() => {
         jasmine.useRealClock();

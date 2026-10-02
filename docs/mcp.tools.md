@@ -32,7 +32,10 @@ In your `package.json`:
 ```ts
 type Tool = {
   name: string;
-  execute(args: object): unknown | Promise<unknown>;
+  execute(
+    args: object,
+    context?: { signal: AbortSignal; requestId: string | number | null; sessionId: string | null },
+  ): unknown | Promise<unknown>;
   title?: string;
   description?: string;
   inputSchema?: object;
@@ -99,6 +102,12 @@ Prefer read-only tools, and design a mutating one to be idempotent and narrowly 
 Give a real `description` and an `inputSchema`. They are the only things the host has to decide whether and how to call your tool; a tool without them is effectively invisible.
 
 `execute` may return anything serialisable. Return structured data rather than pre-formatted prose.
+
+Object results are returned as MCP `structuredContent` alongside their JSON text representation. Arrays and scalar results keep the text representation. A provider can continue to implement `execute(args)`; the optional second argument adds request context without changing existing tools.
+
+`context.signal` aborts when an observation is cancelled, its HTTP caller disconnects, its session ends, the bridge stops, or its provider is withdrawn or replaced. Bounded waits should listen to that signal and dispose their timers and subscriptions. Cancellation only stops waiting: it must not interrupt kernel work that a mutating tool already accepted. Such tools should return an execution receipt promptly and expose separate status and interrupt operations.
+
+The stdio connector allows tool calls to overlap while keeping initialization and window selection ordered. A pending observation therefore does not delay another tool call or its cancellation notification. Providers must serialize conflicting writes themselves and identify their target explicitly.
 
 ## Teardown
 
