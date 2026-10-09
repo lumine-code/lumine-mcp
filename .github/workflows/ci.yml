@@ -40,15 +40,29 @@ jobs:
         run: npm run lint
       - name: Check formatting
         run: npm run format:check
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+      - name: Check package contents
+        run: npm pack --dry-run
 
   integration:
     # Run the Jasmine spec suite inside a real Lumine build; the specs exercise
     # the editor runtime (text editors, modal panels, and command dispatch).
-    name: Lumine integration specs
-    runs-on: ubuntu-latest
+    name: Lumine integration specs on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
     env:
       LUMINE_JASMINE_REPORTER: list
+      TEMP: ${{ github.workspace }}/lumine-mcp-spec-tmp
+      TMP: ${{ github.workspace }}/lumine-mcp-spec-tmp
+      TMPDIR: ${{ github.workspace }}/lumine-mcp-spec-tmp
     steps:
       - uses: actions/checkout@v7
         with:
@@ -62,7 +76,10 @@ jobs:
           node-version-file: lumine/.nvmrc
           cache: npm
           cache-dependency-path: lumine/package-lock.json
+      - name: Create the private temporary directory
+        run: mkdir -p "$TEMP"
       - name: Install Linux build and headless-display dependencies
+        if: runner.os == 'Linux'
         run: |
           # A third-party repository on the runner image answering 403 must not
           # fail the job: the lists this actually needs still fetched, and the
@@ -92,4 +109,9 @@ jobs:
       - name: Run the Jasmine spec suite
         working-directory: lumine
         timeout-minutes: 20
-        run: xvfb-run --auto-servernum npm start -- --test ../lumine-mcp/spec
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            xvfb-run --auto-servernum npm start -- --test ../lumine-mcp/spec
+          else
+            npm start -- --test ../lumine-mcp/spec
+          fi
