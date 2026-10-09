@@ -95,7 +95,7 @@ module.exports = {
 
 Names are a **flat global namespace** shared with every other package's tools and with `lumine-mcp`'s built-ins, so prefix distinctively — `GetLinterMessages` rather than `Get`.
 
-**A built-in's name is refused**, with an error logged and nothing registered under it: execution resolves the built-in first, so the tool would be listed and then never reachable. Between two packages the later registration wins, and withdrawing the earlier one leaves the winner in place rather than taking it down with it.
+**A built-in's name is refused**, with an error logged and nothing registered under it: execution resolves the built-in first, so the tool would be listed and then never reachable. Between two packages the latest live registration wins. Withdrawing it restores the previous registration, and withdrawing an older edge leaves the winner in place. Shared tool objects remain registered until their final edge leaves.
 
 Prefer read-only tools, and design a mutating one to be idempotent and narrowly scoped — the caller is a model, and it may retry.
 
@@ -112,6 +112,8 @@ The stdio connector allows tool calls to overlap while keeping initialization an
 ## Teardown
 
 `consumeMcpTools` returns a `Disposable` that unregisters exactly the tools that were accepted from your array. You need not track them yourself.
+
+The bridge also retires these registrations when its package deactivates, including manually consumed tool arrays. A lease retained from the old activation cannot remove tools belonging to a later activation.
 
 ## Versioning
 

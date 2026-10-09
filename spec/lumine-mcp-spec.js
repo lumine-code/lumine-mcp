@@ -20,6 +20,8 @@ describe("lumine-mcp", () => {
     lumine.hooks.trigger("core:loaded-shell-environment");
     mainModule = (await activation).mainModule;
     bridgeApi = require("../lib/bridge");
+    const start = bridgeApi.startBridge;
+    spyOn(bridgeApi, "startBridge").and.callFake((options) => start({ ...options, port: 0 }));
   });
 
   afterEach(() => {
