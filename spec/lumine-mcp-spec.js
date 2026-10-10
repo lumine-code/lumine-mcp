@@ -829,6 +829,7 @@ describe("lumine-mcp", () => {
               ...env,
             },
             stdio: ["pipe", "pipe", "pipe"],
+            windowsHide: true,
           },
         );
         require("readline")
