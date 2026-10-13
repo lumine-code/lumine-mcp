@@ -128,7 +128,8 @@ describe("MCP native operation receipts and transport", () => {
   it("returns an explicit cancellation for a native unsaved editor save", async () => {
     const editor = await lumine.workspace.open();
     editor.setText("owned unsaved source\n");
-    const dialog = spyOn(lumine.applicationDelegate, "showSaveDialog").and.resolveTo({
+    const window = lumine.workspace.paneForItem(editor).getContainer().getWindow();
+    const dialog = spyOn(window, "showSaveDialog").and.resolveTo({
       canceled: true,
     });
     const result = await tools.executeTool("SaveFile");
@@ -142,7 +143,8 @@ describe("MCP native operation receipts and transport", () => {
     const editor = await lumine.workspace.open();
     editor.setText("owned accepted source\n");
     const destination = path.join(directory, "accepted.txt");
-    spyOn(lumine.applicationDelegate, "showSaveDialog").and.resolveTo({ filePath: destination });
+    const window = lumine.workspace.paneForItem(editor).getContainer().getWindow();
+    spyOn(window, "showSaveDialog").and.resolveTo({ filePath: destination });
     expect(await tools.executeTool("SaveFile")).toEqual({
       success: true,
       data: { saved: true, path: destination },

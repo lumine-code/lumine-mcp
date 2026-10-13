@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 
 // Full-suite replay also blocks launchers used by independently loaded peers.
 jasmine.getEnv().allowRespy(true);
@@ -20,7 +21,7 @@ describe("MCP client registration with a multiline TOML array", () => {
     lumine.config.set("lumine-mcp.autoStart", false);
     await lumine.packages.activatePackage("language-toml");
     main = (await lumine.packages.activatePackage("lumine-mcp")).mainModule;
-    root = fs.mkdtempSync(path.join(process.env.TMPDIR, "mcp-toml-native-"));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-toml-native-"));
     const home = path.join(root, "codex");
     temporary = path.join(root, "temporary");
     fs.mkdirSync(home);
@@ -81,7 +82,7 @@ describe("MCP client registration with a multiline TOML array", () => {
     if (lumine.packages.isPackageLoaded("lumine-mcp"))
       await lumine.packages.unloadPackage("lumine-mcp");
     await lumine.fileWatchClient.settlePendingTeardown();
-    const relative = path.relative(fs.realpathSync(process.env.TMPDIR), fs.realpathSync(root));
+    const relative = path.relative(fs.realpathSync(os.tmpdir()), fs.realpathSync(root));
     if (!relative || relative.startsWith("..") || path.isAbsolute(relative))
       throw new Error("Owned config cleanup escaped the private temporary directory");
     fs.unlinkSync(configPath);
