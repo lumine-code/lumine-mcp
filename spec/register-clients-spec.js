@@ -134,7 +134,8 @@ describe("lumine-mcp client registration", () => {
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
   it("keeps the six package commands in one flat menu", () => {
-    const menu = require("../menus/main.json").menu[0].submenu[0].submenu;
+    const menu = require("../menus/main.json").menu.find((item) => item.label === "Packages")
+      .submenu[0].submenu;
     expect(menu.length).toBe(6);
     expect(menu.some((item) => item.type === "separator" || item.submenu)).toBe(false);
     expect(menu.map((item) => item.command)).toContain("lumine-mcp:register-to-claude");
