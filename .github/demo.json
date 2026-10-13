@@ -1,0 +1,17 @@
+{
+  "title": "lumine-mcp",
+  "description": "Choose the editor tools exposed through the MCP integration.",
+  "recordedOn": "2026-10-13",
+  "sourceRevision": "47238aec70097f8eda6509a95f4d71776446a07d",
+  "mode": "normal",
+  "fontSettings": "default",
+  "themeSourceRevision": "6564a9e21899b5541e9c8f8006f9be6d6d72e6ad",
+  "images": [
+    {
+      "file": "demo.png",
+      "label": "Choose the editor tools exposed through the MCP integration.",
+      "width": 1100,
+      "height": 730
+    }
+  ]
+}

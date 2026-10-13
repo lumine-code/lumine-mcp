@@ -13,6 +13,8 @@ Model Context Protocol server exposing editor tools to AI assistants.
 - **Request lifecycle**: observation waits allow concurrent calls, cancellation releases their resources, and object results include structured content.
 - **Toggle tools**: enable/disable individual tools via select list; tab and project removal tools are disabled by default.
 
+![Choose the editor tools exposed through the MCP integration.](.github/demo.png)
+
 ## Installation
 
 To install `lumine-mcp` search for it in the Install pane of the Lumine settings, or run the command `lumine --install lumine-code/lumine-mcp`.
