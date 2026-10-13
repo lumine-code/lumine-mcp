@@ -8,7 +8,9 @@
           "submenu": [
             {
               "label": "MCP Tools",
-              "command": "lumine-mcp:toggle-tools"
+              "command": "lumine-mcp:toggle-tools",
+              "group": "services",
+              "order": 20
             }
           ]
         }
