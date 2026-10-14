@@ -33,6 +33,10 @@ module.exports = [
     },
   },
   {
+    files: ["demo/workflows/**/*.js"],
+    languageOptions: { sourceType: "module" },
+  },
+  {
     // The lint configuration itself requires devDependencies; it never ships.
     files: ["eslint.config.js"],
     rules: {
