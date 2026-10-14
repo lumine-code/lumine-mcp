@@ -1,18 +1,13 @@
 {
   "menu": [
     {
-      "label": "View",
+      "label": "Developer",
       "submenu": [
         {
-          "label": "Developer",
-          "submenu": [
-            {
-              "label": "MCP Tools",
-              "command": "lumine-mcp:toggle-tools",
-              "group": "services",
-              "order": 20
-            }
-          ]
+          "label": "MCP Tools",
+          "command": "lumine-mcp:toggle-tools",
+          "group": "services",
+          "order": 20
         }
       ]
     },
