@@ -25,13 +25,19 @@ describe("MCP bridge port allocation", () => {
   }
 
   async function occupyPort() {
-    const server = http.createServer((_request, response) => response.end("occupied"));
-    servers.push(server);
-    await new Promise((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", resolve);
-    });
-    return { server, port: server.address().port };
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const server = http.createServer((_request, response) => response.end("occupied"));
+      servers.push(server);
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", resolve);
+      });
+      const port = server.address().port;
+      // Leave room for the scan when Windows chooses a high ephemeral port.
+      if (port <= 65435) return { server, port };
+      await close(server);
+    }
+    throw new Error("Could not choose a base port with room for the bridge scan");
   }
 
   async function freePort() {
