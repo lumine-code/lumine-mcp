@@ -22,6 +22,8 @@ describe("lumine-mcp item actions", () => {
     view.selectList.setItems([tool]);
     const actions = view.selectList.getAvailableActions();
     const byCommand = new Map(actions.map((action) => [action.command, action]));
+    expect(view.selectList.supportsKeepOpen()).toBe(false);
+    expect(byCommand.has("select-list:toggle-keep-open")).toBe(false);
 
     expect([...byCommand.keys()].sort()).toEqual([
       "lumine-mcp:disable-all",
