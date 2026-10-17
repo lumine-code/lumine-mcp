@@ -25,17 +25,27 @@ describe("MCP bridge port allocation", () => {
   }
 
   async function occupyPort() {
+    let requestedPort = 0;
     for (let attempt = 0; attempt < 20; attempt++) {
       const server = http.createServer((_request, response) => response.end("occupied"));
       servers.push(server);
-      await new Promise((resolve, reject) => {
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", resolve);
-      });
+      try {
+        await new Promise((resolve, reject) => {
+          server.once("error", reject);
+          server.listen(requestedPort, "127.0.0.1", resolve);
+        });
+      } catch (error) {
+        if (requestedPort === 0 || !["EADDRINUSE", "EACCES"].includes(error.code)) throw error;
+        requestedPort += 100;
+        continue;
+      }
       const port = server.address().port;
-      // Leave room for the scan when Windows chooses a high ephemeral port.
       if (port <= 65435) return { server, port };
       await close(server);
+      // Repeated ephemeral allocations can stay in the same high port band.
+      // Probe explicit unprivileged bases with scan room instead of hoping the
+      // OS changes its ephemeral allocation range on the next request.
+      requestedPort = requestedPort === 0 ? 32768 : requestedPort + 100;
     }
     throw new Error("Could not choose a base port with room for the bridge scan");
   }
@@ -113,6 +123,50 @@ describe("MCP bridge port allocation", () => {
     expect(new Set(running.map((result) => result.value.port)).size).toBe(2);
     for (const result of running) await expectHealthy(result.value);
   });
+
+  for (const unavailable of ["EADDRINUSE", "EACCES"]) {
+    it(`finds fixture scan room after a high ephemeral suggestion and ${unavailable}`, async () => {
+      const createServer = http.createServer;
+      const requested = [];
+      spyOn(http, "createServer").and.callFake((...args) => {
+        const server = createServer(...args);
+        const listen = server.listen;
+        const address = server.address;
+        let requestedPort;
+        server.listen = function (port, ...rest) {
+          requestedPort = port;
+          requested.push(port);
+          if (port === 32768) {
+            queueMicrotask(() =>
+              server.emit(
+                "error",
+                Object.assign(new Error("fixture port unavailable"), {
+                  code: unavailable,
+                }),
+              ),
+            );
+            return this;
+          }
+          return listen.call(this, port, ...rest);
+        };
+        server.address = function () {
+          const bound = address.call(this);
+          return requestedPort === 0 && bound ? { ...bound, port: 65535 } : bound;
+        };
+        return server;
+      });
+
+      const { server, port } = await occupyPort();
+      expect(requested.slice(0, 3)).toEqual([0, 32768, 32868]);
+      expect(requested.filter((value) => value === 0).length).toBe(1);
+      expect(port).toBeLessThanOrEqual(65435);
+      expect(server.address().port).toBe(port);
+      const response = await fetch(`http://127.0.0.1:${port}/`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      expect(await response.text()).toBe("occupied");
+    });
+  }
 
   it("starts several simultaneous windows on distinct working ports", async () => {
     const port = await freePort();
