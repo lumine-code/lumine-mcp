@@ -1,9 +1,9 @@
 {
   "title": "lumine-mcp",
   "description": "Choose the editor tools exposed through the MCP integration.",
-  "recordedOn": "2026-10-14",
-  "sourceRevision": "3cd4ee1e99d24223a46bd5f44f37c33667e49222",
-  "themeSourceRevision": "7fbd047a87ecf1367c896b19ff270cdc28d319f7",
+  "recordedOn": "2026-10-18",
+  "sourceRevision": "70c109f91f943c8c61933cae042d52b3ea135490",
+  "themeSourceRevision": "45b22049e87256e9327beb0b350e67fe81d7fc81",
   "mode": "normal",
   "fontSettings": "default",
   "scenario": "demo.js",
@@ -11,8 +11,8 @@
   "environment": {
     "platform": "win32",
     "arch": "x64",
-    "electron": "44.7.0",
-    "chrome": "152.0.7977.130",
+    "electron": "44.9.0",
+    "chrome": "152.0.7977.167",
     "devicePixelRatio": 1,
     "locale": "en-GB",
     "fontFamily": "Fira Code, Menlo, DejaVu Sans Mono, Consolas, monospace",
@@ -21,29 +21,30 @@
   },
   "viewport": { "width": 1100, "height": 730 },
   "cornerRadius": 10,
+  "privacy": { "version": 1, "location": "neutral", "textChecked": true },
   "sources": {
     "editor": {
-      "revision": "8be8f86075ad93df038610d82b3ac6d99329957d",
-      "dirty": true,
-      "workingTreeHash": "0a9458f6e3959fe7a52b2fec76abef27dcbaa9792f192b81ac1e3f6b2be82009"
+      "revision": "10950c83cb6d964aadbcf4036af67c6484c1341d",
+      "dirty": false,
+      "workingTreeHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "package": {
-      "revision": "3cd4ee1e99d24223a46bd5f44f37c33667e49222",
+      "revision": "70c109f91f943c8c61933cae042d52b3ea135490",
       "dirty": false,
       "workingTreeHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "lumine-mcp": {
-      "revision": "3cd4ee1e99d24223a46bd5f44f37c33667e49222",
+      "revision": "70c109f91f943c8c61933cae042d52b3ea135490",
       "dirty": false,
       "workingTreeHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "language-javascript": {
-      "revision": "ae2e6968e3a349fb4d09ce53e339a0f8cce903aa",
+      "revision": "721d40ef20e4ffda4125b375f50c908541fa7c08",
       "dirty": false,
       "workingTreeHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "one-theme": {
-      "revision": "7fbd047a87ecf1367c896b19ff270cdc28d319f7",
+      "revision": "45b22049e87256e9327beb0b350e67fe81d7fc81",
       "dirty": false,
       "workingTreeHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     }
@@ -60,7 +61,7 @@
       "label": "Choose the editor tools exposed through the MCP integration.",
       "width": 1100,
       "height": 730,
-      "sha256": "22eae54e322b5c612be1198588d308b5163d727d03551f7df39a7f067c03e33e"
+      "sha256": "da3e05d3fccd724608c2439421c34d37dec6d3a98abbb9f4914151093c5ed75c"
     }
   ]
 }
