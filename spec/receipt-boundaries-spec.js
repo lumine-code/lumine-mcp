@@ -37,7 +37,13 @@ describe("MCP native operation receipts and transport", () => {
     const relative = path.relative(fs.realpathSync(os.tmpdir()), fs.realpathSync(directory));
     if (!relative || relative.startsWith("..") || path.isAbsolute(relative))
       throw Error("Unsafe owned scratch cleanup");
-    fs.rmSync(directory, { recursive: true, force: true });
+    // Windows may briefly retain a handle after the save/watch teardown.
+    await fs.promises.rm(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 50,
+    });
   });
   const deferred = () => {
     let resolve;
