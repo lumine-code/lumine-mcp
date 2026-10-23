@@ -151,12 +151,42 @@ describe("lumine-mcp", () => {
 
   describe("bridge server", () => {
     let bridge, base, auth;
+    const recentRequests = [];
+    const recentPorts = [];
+
+    const fetchBridge = async (route, options = {}) => {
+      const url = `${base}${route}`;
+      const method = options.method ?? "GET";
+      try {
+        const response = await fetch(url, options);
+        recentRequests.push({ url, method, status: response.status });
+        if (recentRequests.length > 12) recentRequests.shift();
+        return response;
+      } catch (error) {
+        try {
+          console.error(
+            "MCP_BRIDGE_FETCH_FAILURE " +
+              JSON.stringify({
+                url,
+                method,
+                port: bridge?.port,
+                recentPorts,
+                recentRequests,
+                error: { name: error?.name, message: error?.message },
+              }),
+          );
+        } catch {
+          // Diagnostic formatting must preserve the original fetch failure.
+        }
+        throw error;
+      }
+    };
 
     // Every route past /health wants the token, so almost every request in
     // this suite carries it; the ones that deliberately do not say so.
-    const get = (route) => fetch(`${base}${route}`, { headers: auth });
+    const get = (route) => fetchBridge(route, { headers: auth });
     const post = (route, body) =>
-      fetch(`${base}${route}`, {
+      fetchBridge(route, {
         method: "POST",
         headers: { ...auth, "Content-Type": "application/json" },
         body: typeof body === "string" ? body : JSON.stringify(body),
@@ -196,6 +226,8 @@ describe("lumine-mcp", () => {
       jasmine.useRealClock();
       // Port 0 lets the OS assign a free ephemeral port: no CI collisions.
       bridge = await bridgeApi.startBridge({ port: 0 });
+      recentPorts.push(bridge.port);
+      if (recentPorts.length > 12) recentPorts.shift();
       base = `http://127.0.0.1:${bridge.port}`;
       auth = { Authorization: `Bearer ${bridge.token}` };
       lumine.notifications.clear();
