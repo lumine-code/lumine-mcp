@@ -59,6 +59,8 @@ A tool that takes a `path` matches it the way the filesystem does — case-insen
 
 An assistant brings its own file tools, its own search and its own shell, and they are better than anything here at reading a file off disk. `ReadText` and `WriteText` are for the cases those tools get wrong: an open document whose `fileState` is `modified`, `conflicted`, or `removed`, where the disk does not hold what the user sees. `GetOpenEditors` reports that state for every editor.
 
+Text protocol responses are bounded independently of document size. `ReadText` returns at most `maxUnits` UTF-16 units (default and maximum 1 Mi), with `hasMore`, `nextPosition` and `revision`; continue using `start: nextPosition` and the returned revision to detect edits between pages. CRLF and surrogate pairs remain intact. `GetSelections({includeText: false})` returns lengths and ranges even for huge selections. `WriteText` checks its 1 Mi input and returned-text budgets before changing anything; use `returnOldText: false` to replace a larger range without returning its previous contents. Selection tools accept at most 2,000 cursors. No read reports a partial page as the complete document.
+
 Which tools are on is a list plus a mode. Under a **blacklist**, everything is on except what is listed, and a tool registered later arrives on; under a **greenlist**, only what is listed is on, and a tool registered later arrives off. Switching mode inverts the list with it, so the same tools stay on and only the default for a newcomer changes.
 
 ## Tools from other packages
